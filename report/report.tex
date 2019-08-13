@@ -1,0 +1,86 @@
+\documentclass[a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage{amsfonts}
+\usepackage{xcolor}
+\usepackage[detect-all]{siunitx}
+\usepackage{pgfplots}
+\usepackage{natbib}
+\bibliographystyle{abbrvnat}
+
+\begin{document}
+
+\title{Continuous reaction-diffusion process}
+\author{Adrien Berchet}
+
+\maketitle
+
+\section*{Introduction}
+
+The skin of oscellated lizards presents labyrinthine pattern that look close to the ones obtained by a quasi-hexagonal probabilistic cellular automaton. This goal of this work is to model the skin color dynamics during the lizards' life using a reaction-diffusion model \citep{Manukyan2017}. The skin of oscellated lizards contains 3 kinds of pigmentary elements: melanophores, xanthophores and iridophores, but the reaction-diffusion model is only applied to melanophores and xanthophores because the contribution of iridophores is neglictible in the process \citep{Nakamasu8429}.
+
+\section{The continuous reaction-diffusion model}
+
+The continuous reaction-diffusion model is represented by the following system of nonlinear partial differential equations \citep{Nakamasu8429}:
+
+\begin{align}
+	\dfrac{\partial u}{\partial t} & = F ( u , v , w ) - c_u u + D_u \nabla^2 u \\
+	\dfrac{\partial v}{\partial t} & = G ( u , v , w ) - c_v v + D_v \nabla^2 v \\
+	\dfrac{\partial w}{\partial t} & = H ( u , v , w ) - c_w w + D_w \nabla^2 w
+	\label{rd_eq}
+\end{align}
+\begin{align}
+	F ( u , v , w ) & = \begin{cases} \begin{aligned}
+		0, && c_1 v + c_2 w + c_3 < 0 \\
+		c_1 v + c_2 w + c_3, && 0 \leq c_1 v + c_2 w + c_3 \leq F_{max} \\
+		F_{max}, && F_{max} < c_1 v + c_2 w + c_3
+	\end{aligned} \end{cases} \\
+	G ( u , v , w ) & = \begin{cases} \begin{aligned}
+		0, && c_4 u + c_5 w + c_6 < 0 \\
+		c_4 u + c_5 w + c_6, && 0 \leq c_4 u + c_5 w + c_6 \leq G_{max} \\
+		G_{max}, && G_{max} < c_4 u + c_5 w + c_6
+	\end{aligned} \end{cases} \\
+	H ( u , v , w ) & = \begin{cases} \begin{aligned}
+		0, && c_7 u + c_8 v + c_9 < 0 \\
+		c_7 u + c_8 v + c_9, && 0 \leq c_7 u + c_8 v + c_9 \leq H_{max} \\
+		H_{max}, && H_{max} < c_7 u + c_8 v + c_9
+	\end{aligned} \end{cases}
+	\label{rd_eq_interactions}
+\end{align}
+
+In equation \ref{rd_eq}, $u$ and $v$ components represent the densities of melanophores and xanthophores, respectively. The $w$ component represents a long-range factor (diffusion coefficient $D_w$ much larger than $D_u$ and $D_v$ ) produced by melanophores only.
+In equation \ref{rd_eq_interactions}, $F$, $G$ and $H$ represents interactions among the chromatophores.
+
+This model is implemented on a $2000 \times 380$ square lattice with step $\epsilon$ using periodic boundary conditions. In order to model the difference of skin thickness inside the skin scales versus their borders, regular hexagonal pattern (with hexagon side length $S$) is superimposed on the regular grid and the diffusion coefficients is reduced at the boundaries of hexagons: the Laplacian is multiplied by a factor $P \sin (\theta)$ at edges intersecting an hexagon boundary with angle $\theta$.
+
+\section{aa} % (fold)
+Exemple de tableau~:
+\begin{table}
+\centering
+\begin{tabular}{ | >{\centering\arraybackslash}m{0.2\textwidth} | >{\centering\arraybackslash}m{0.2\textwidth} | >{\centering\arraybackslash}m{0.2\textwidth} | }
+	\hline
+	\centering  Les noms des paramètres & Colonne A & Colonne B \\
+	\hline
+	$t_B$ & $\SI{3}{s}$ & $\SI{5.5}{s}$ \\
+	\hline
+	$w_s$ & $\SI{7.1e-3}{m/s}$ & $\SI{7.1e-3}{m/s}$ \\
+	\hline
+	$\beta_1$ & $1.1$ & $1.5$ \\
+	\hline
+	$\beta_2$ & $9.37$ & $4.87$ \\
+	\hline
+	$\beta_3$ & $\num{0.605}$ & $\num{0.63}$ \\
+	\hline
+\end{tabular}
+\caption{Un tableau.}
+\label{ta:res:param}
+\end{table}
+% section aa (end)
+
+\bibliography{biblio.bib}
+
+\listoftables
+\listoffigures
+
+\end{document}

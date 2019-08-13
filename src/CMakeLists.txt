@@ -4,6 +4,8 @@ ADD_EXECUTABLE(
     continuous_rd.cpp
 )
 
+SET_PROPERTY(TARGET continuous_rd.exe PROPERTY CUDA_STANDARD 14)
+
 IF( GPU )
   TARGET_COMPILE_DEFINITIONS(continuous_rd.exe PRIVATE -DWITH_GPU)
 ENDIF( GPU )

@@ -1,8 +1,9 @@
 # Example of command if a lib is located in a custom directory:
 # cmake -DBOOST_ROOT:PATHNAME=~/libs/Boost_x11 -DBoost_LIBRARY_DIRS:FILEPATH=~/libs/Boost_x11/lib ..
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.8.2)
 
+ENABLE_LANGUAGE(CUDA)
 ENABLE_LANGUAGE(CXX)
 
 PROJECT(RD_CHALLENGE)
