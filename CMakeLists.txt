@@ -4,7 +4,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.8.2)
 
 ENABLE_LANGUAGE(CUDA)
-ENABLE_LANGUAGE(CXX)
+# ENABLE_LANGUAGE(CXX)
 
 PROJECT(RD_CHALLENGE)
 
@@ -20,27 +20,30 @@ IF(POLICY CMP0042)
 ENDIF()
 
 OPTION(THREAD       "Build binaries with multi-threading enabled" ON)
-OPTION(GPU          "Build binaries with GPU enabled" OFF)
+OPTION(GPU          "Build binaries with GPU enabled" ON)
 OPTION(DOC          "Setup the doxygen documentation (must run \"make doc\" afterwards to actually build the doc)" OFF)
 OPTION(TESTS        "Setup the test suite" OFF)
 OPTION(PROFILING    "Enable profiling" OFF)
 
 # Get the last tag committed
 # Another command can get the current branch: git rev-parse --abbrev-ref HEAD
-EXECUTE_PROCESS(
-    COMMAND git describe --abbrev=0 --tags --match=[0-9].[0-9].[0-9]
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE GIT_BRANCH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+# EXECUTE_PROCESS(
+#     COMMAND git describe --abbrev=0 --tags --match=[0-9].[0-9].[0-9]
+#     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+#     OUTPUT_VARIABLE GIT_BRANCH
+#     OUTPUT_STRIP_TRAILING_WHITESPACE
+# )
 
-IF(THREAD)
-    ADD_DEFINITIONS(-DTHREAD)
-ENDIF(THREAD)
+# IF(THREAD)
+#     ADD_DEFINITIONS(-DTHREAD)
+# ENDIF(THREAD)
 
-FIND_PACKAGE(Boost 1.60.0 REQUIRED)
+FIND_PACKAGE(Boost 1.70.0 REQUIRED)
 INCLUDE_DIRECTORIES(SYSTEM ${Boost_INCLUDE_DIRS})
 LINK_DIRECTORIES(SYSTEM ${Boost_LIBRARY_DIRS})
+
+FIND_PACKAGE(CUDA 10.1 REQUIRED)
+# LIST(APPEND CUDA_NVCC_FLAGS -Xcompiler -fopenmp)
 
 ADD_SUBDIRECTORY(src)
 

@@ -1,7 +1,7 @@
 # Generate the executable
 ADD_EXECUTABLE(
     continuous_rd.exe
-    continuous_rd.cpp
+    continuous_rd.cu
 )
 
 SET_PROPERTY(TARGET continuous_rd.exe PROPERTY CUDA_STANDARD 14)
