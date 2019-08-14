@@ -1,4 +1,9 @@
 # Generate the executable
+# CUDA_ADD_EXECUTABLE(
+#     continuous_rd.exe
+#     continuous_rd.cpp
+#     continuous_rd_device.cu
+# )
 ADD_EXECUTABLE(
     continuous_rd.exe
     continuous_rd.cu
