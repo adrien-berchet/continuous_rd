@@ -5,6 +5,7 @@
 #include <thrust/iterator/permutation_iterator.h>
 #include <thrust/iterator/counting_iterator.h>
 
+#include <boost/filesystem.hpp>
 #include <boost/numeric/odeint/stepper/runge_kutta4.hpp>
 #include <boost/numeric/odeint/integrate/integrate_const.hpp>
 #include <boost/numeric/odeint/external/thrust/thrust.hpp>
@@ -305,7 +306,11 @@ int main( int argc , char* argv[] )
 	params.read(argc, argv);
 	cout<<params<<endl;
 
-	// std::filesystem::create_directories(param.result_folder);
+	if(!boost::filesystem::is_directory(params.result_folder))
+	{
+		boost::filesystem::create_directories(params.result_folder);
+	}
+	params.write_parameters(params.result_folder + "/parameters_used.prm");
 
 	simulate_rd(params);
 

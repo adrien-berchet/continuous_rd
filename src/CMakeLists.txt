@@ -6,8 +6,9 @@
 # )
 ADD_EXECUTABLE(
     continuous_rd.exe
-    continuous_rd.cpp
-    continuous_rd_device.cu
+    continuous_rd.cu
+    # continuous_rd.cpp
+    # continuous_rd_device.cu
 )
 
 SET_PROPERTY(TARGET continuous_rd.exe PROPERTY CUDA_STANDARD 14)
