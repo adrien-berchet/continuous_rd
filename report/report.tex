@@ -60,6 +60,26 @@ Because of the quite large number of numerical elements, parallele computation i
 
 \section{Validation}
 
+The right-hand side of each component contains 3 terms: an interaction term, a decay term and a diffusion term. The interaction term acts like a source or a sink, depending on the other component values. This first term is trivial and is not validated in this report. The two other decay and diffusion terms are validated by comparing to analytical values for simple setups that are presented in the following subsections.
+
+\subsection{Diffusion term}
+
+The right-hand side of each component contains a diffusion term for which the analytical solution is known. It is thus possible to validate this term by setting all other terms to zero and by comparing the dynamics to the analytical solution. In this model, a simple diffusion process is obtained if the following constants are set to zero: $c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_u, c_v$ and $c_w$.
+Also, the term $P \sin (\theta)$ is ignored in this validation process.
+
+In these conditions, each component should follow the equation \ref{eq:diffusion}.
+
+\begin{align}
+\label{eq:diffusion}
+	C_i(r, t)= \dfrac{ \left( 2 \pi \right) ^\frac{N}{2} \sigma^N_i }{ \left[ 4 \pi D_i \left( t + \dfrac{\sigma^2_i}{2D_i} \right) \right]^\frac{N}{2} } \exp \left(- \dfrac{r^2}{4 D_i \left ( t+ \dfrac{\sigma^2_i}{2D_i} \right) } \right)
+\end{align}
+where $C_i(t)$ is the value of the component $i$, $N$ is the number of dimensions (2 in our case), $D_i$ is the diffusion coefficient for the component $i$, $\sigma_i$ is the standard deviation of the gaussian distribution at $t=0$ for the component $i$ and $r$ is the distance from the center of this gaussian distribution.
+
+
+\subsection{Decay term}
+
+The 
+
 \section{Results}
 
 \bibliography{biblio.bib}
