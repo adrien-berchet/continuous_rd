@@ -247,7 +247,24 @@ private:
 	index_vector_type top, bot, left, right;
 };
 
-void simulate_rd(Parameters &params)
+struct observer
+{
+    value_type m_K_mean;
+    size_t m_count;
+
+    observer( void ) { }
+
+    template< class State >
+    void operator()( const State &x , value_type t )
+    {
+    	std::cout<<"t="<<t<<"s"<<std::endl;
+    	thrust::copy( x.begin() , x.begin() + 10 , std::ostream_iterator< value_type >( std::cout , "\n" ) );
+    	std::cout<<std::endl<<std::endl;
+    }
+
+};
+
+std::vector<value_type> simulate_rd(Parameters &params)
 {
 	// get values from parameters
 	const double cu=params.cu, cv=params.cv, cw=params.cw;
@@ -292,12 +309,14 @@ void simulate_rd(Parameters &params)
 		Fmax, Gmax, Hmax
 	);
 
-	// integrate
-	integrate_const( stepper , sys , x , 0.0 , 10.0 , dt );
+	// create observer
+	observer obs;
 
-	// print some results
-	thrust::copy( x.begin() , x.begin() + 10 , std::ostream_iterator< value_type >( std::cout , "\n" ) );
-	std::cout << std::endl;
+	// integrate
+	integrate_const( stepper , sys , x , 0.0 , params.tmax , dt , boost::ref(obs));
+
+	thrust::copy( x.begin() , x.end() , x_host.begin() );
+	return x_host;
 }
 
 int main( int argc , char* argv[] )
@@ -312,6 +331,9 @@ int main( int argc , char* argv[] )
 	}
 	params.write_parameters(params.result_folder + "/parameters_used.prm");
 
-	simulate_rd(params);
+	vector<value_type> result = simulate_rd(params);
 
+	// print some results
+	std::copy( result.begin() , result.begin() + 10 , std::ostream_iterator< value_type >( std::cout , "\n" ) );
+	std::cout << std::endl;
 }
