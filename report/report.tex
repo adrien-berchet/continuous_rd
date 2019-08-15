@@ -56,7 +56,7 @@ This model is implemented on a $2000 \times 380$ square lattice with step $\epsi
 
 \section{Code implementation details}
 
-Because of the quite large number of numerical elements, parallele computation is required in order to obtain the results in a decent time. The library Boost::ODEINT, which aims to solve ordinary differential equations, can be coupled with the Thrust library witch can use the GPU for computation.
+The code implementation was guided by the short delay and by the computation time. The delay did not allow to test several libraries so a low level approach was chosen. Furthermore, because of the quite large number of numerical elements, parallele computation is required in order to obtain the results in a decent time. The library Boost::ODEINT, which aims to solve ordinary differential equations, can be coupled with the Thrust library witch is meant to use the GPU for calculation. The Boost::ODEINT library was chosen for its simplicity and its simplicity and because it is very convenient to switch from a numerical scheme to another. In this work, the Runge-Kutta 4 scheme is used. Also, this library has simple mechanisms to monitor temporary results.
 
 \section{Validation}
 
