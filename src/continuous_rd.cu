@@ -127,32 +127,44 @@ public:
 		Fmax(Fmax_in), Gmax(Gmax_in), Hmax(Hmax_in),
 		top( 3 * N ), bot( 3 * N ), left( 3 * N ), right( 3 * N )
 	{
-		// Define neighbours
+		// Define neighbors
 		thrust::counting_iterator<size_t> counter( 0 );
 
-		// Top neighbours
-		thrust::copy( counter , counter+(N-Nx) , top.begin()+Nx );
-		thrust::copy( counter+(N-Nx), counter+N , top.begin() );
+		// Top neighbors
+		thrust::copy( counter , counter + (N - Nx) , top.begin() + Nx ); // u component
+		thrust::copy( counter + N , counter + (2 * N - Nx) , top.begin() + N + Nx ); // v component
+		thrust::copy( counter + 2 * N , counter + (3 * N - Nx) , top.begin() + 2 * N + Nx ); // w component
+		thrust::copy( counter + (N - Nx), counter + N , top.begin() ); // u component
+		thrust::copy( counter + (2 * N - Nx), counter + 2 * N , top.begin() + N ); // v component
+		thrust::copy( counter + (3 * N - Nx), counter + 3 * N , top.begin() + 2 * N); // w component
 
-		// Bottom neighbours
-		thrust::copy( counter+Nx , counter+N , bot.begin() );
-		thrust::copy( counter, counter+Nx , bot.begin()+N-Nx );
+		// Bottom neighbors
+		thrust::copy( counter + Nx , counter + N , bot.begin() ); // u component
+		thrust::copy( counter + N + Nx , counter + 2 * N , bot.begin() + N ); // v component
+		thrust::copy( counter + 2 * N + Nx , counter + 3 * N , bot.begin() + 2 * N ); // w component
+		thrust::copy( counter, counter + Nx , bot.begin() + N - Nx ); // u component
+		thrust::copy( counter + N, counter + N + Nx , bot.begin() + 2 * N - Nx ); // V component
+		thrust::copy( counter + 2 * N, counter + 2 * N + Nx , bot.begin() + 3 * N - Nx ); // w component
 
-		// Left neighbours
-		thrust::copy( counter , counter+N-1 , left.begin()+1 );
+		// Left neighbors
+		thrust::copy( counter , counter + 3 * N - 1 , left.begin() + 1 );
 
-		// Right neighbours
-		thrust::copy( counter+1 , counter+N , right.begin() );
+		// Right neighbors
+		thrust::copy( counter + 1 , counter + 3 * N , right.begin() );
 
-		// Adjust left and right neighbours on sides
+		// Adjust left and right neighbors on sides
 		for (int i = 0; i < Ny; ++i)
 		{
-			left[i * Nx] = i * Nx - 1;
-			right[(i + 1) * Nx - 1] = i * Nx;
+			left[i * Nx] = (i + 1) * Nx - 1; // u component
+			right[(i + 1) * Nx - 1] = i * Nx; // u component
+			left[N + i * Nx] = N + (i + 1) * Nx - 1; // v component
+			right[N + (i + 1) * Nx - 1] = N + i * Nx; // v component
+			left[2 * N + i * Nx] = 2 * N + (i + 1) * Nx - 1; // w component
+			right[2 * N + (i + 1) * Nx - 1] = 2 * N + i * Nx; // w component
 		}
 	}
 
-	void operator() ( const state_type &x , state_type &dxdt , const value_type dt )
+	void operator() ( const state_type &x , state_type &dxdt , const value_type )
 	{
 		thrust::for_each(
 			thrust::make_zip_iterator(
@@ -166,27 +178,27 @@ public:
 					) ),
 					thrust::make_zip_iterator(
 						thrust::make_tuple(
-							thrust::make_permutation_iterator( x.begin() , top.begin() ) ,
-							thrust::make_permutation_iterator( x.begin() + N , top.begin() + N ) ,
-							thrust::make_permutation_iterator( x.begin() + 2 * N , top.begin() + 2 * N )
+							thrust::make_permutation_iterator( x.begin(), top.begin() ),
+							thrust::make_permutation_iterator( x.begin(), top.begin() + N ),
+							thrust::make_permutation_iterator( x.begin(), top.begin() + 2 * N )
 					) ) ,
 					thrust::make_zip_iterator(
 						thrust::make_tuple(
-							thrust::make_permutation_iterator( x.begin() , bot.begin() ) ,
-							thrust::make_permutation_iterator( x.begin() + N , bot.begin() + N ) ,
-							thrust::make_permutation_iterator( x.begin() + 2 * N , bot.begin() + 2 * N )
+							thrust::make_permutation_iterator( x.begin(), bot.begin() ),
+							thrust::make_permutation_iterator( x.begin(), bot.begin() + N ),
+							thrust::make_permutation_iterator( x.begin(), bot.begin() + 2 * N )
 					) ) ,
 					thrust::make_zip_iterator(
 						thrust::make_tuple(
-							thrust::make_permutation_iterator( x.begin() , left.begin() ) ,
-							thrust::make_permutation_iterator( x.begin() + N , left.begin() + N ) ,
-							thrust::make_permutation_iterator( x.begin() + 2 * N , left.begin() + 2 * N )
+							thrust::make_permutation_iterator( x.begin(), left.begin() ),
+							thrust::make_permutation_iterator( x.begin(), left.begin() + N ),
+							thrust::make_permutation_iterator( x.begin(), left.begin() + 2 * N )
 					) ) ,
 					thrust::make_zip_iterator(
 						thrust::make_tuple(
-							thrust::make_permutation_iterator( x.begin() , right.begin() ) ,
-							thrust::make_permutation_iterator( x.begin() + N , right.begin() + N ) ,
-							thrust::make_permutation_iterator( x.begin() + 2 * N , right.begin() + 2 * N )
+							thrust::make_permutation_iterator( x.begin(), right.begin() ),
+							thrust::make_permutation_iterator( x.begin(), right.begin() + N ),
+							thrust::make_permutation_iterator( x.begin(), right.begin() + 2 * N )
 					) ) ,
 					thrust::make_constant_iterator( thrust::make_tuple(cu, cv, cw, Du, Dv, Dw) ),
 					thrust::make_constant_iterator( thrust::make_tuple(c1, c2, c3, c4, c5, c6, c7, c8, c9) ),
@@ -206,38 +218,44 @@ public:
 					) ),
 					thrust::make_zip_iterator(
 						thrust::make_tuple(
-							thrust::make_permutation_iterator( x.begin() + N , top.begin() + N ) ,
-							thrust::make_permutation_iterator( x.begin() + 2 * N , top.begin() + 2 * N ),
-							thrust::make_permutation_iterator( x.end() , top.end() )
+							thrust::make_permutation_iterator( x.begin(), top.begin() + N ),
+							thrust::make_permutation_iterator( x.begin(), top.begin() + 2 * N ),
+							thrust::make_permutation_iterator( x.begin(), top.end() )
 					) ) ,
 					thrust::make_zip_iterator(
 						thrust::make_tuple(
-							thrust::make_permutation_iterator( x.begin() + N , bot.begin() + N ) ,
-							thrust::make_permutation_iterator( x.begin() + 2 * N , bot.begin() + 2 * N ),
-							thrust::make_permutation_iterator( x.end() , bot.end() )
+							thrust::make_permutation_iterator( x.begin(), bot.begin() + N ),
+							thrust::make_permutation_iterator( x.begin(), bot.begin() + 2 * N ),
+							thrust::make_permutation_iterator( x.begin(), bot.end() )
 					) ) ,
 					thrust::make_zip_iterator(
 						thrust::make_tuple(
-							thrust::make_permutation_iterator( x.begin() + N , left.begin() + N ) ,
-							thrust::make_permutation_iterator( x.begin() + 2 * N , left.begin() + 2 * N ),
-							thrust::make_permutation_iterator( x.end() , left.end() )
+							thrust::make_permutation_iterator( x.begin(), left.begin() + N ),
+							thrust::make_permutation_iterator( x.begin(), left.begin() + 2 * N ),
+							thrust::make_permutation_iterator( x.begin(), left.end() )
 					) ) ,
 					thrust::make_zip_iterator(
 						thrust::make_tuple(
-							thrust::make_permutation_iterator( x.begin() + N , right.begin() + N ) ,
-							thrust::make_permutation_iterator( x.begin() + 2 * N , right.begin() + 2 * N ),
-							thrust::make_permutation_iterator( x.end() , right.end() )
+							thrust::make_permutation_iterator( x.begin(), right.begin() + N ),
+							thrust::make_permutation_iterator( x.begin(), right.begin() + 2 * N ),
+							thrust::make_permutation_iterator( x.begin(), right.end() )
 					) ) ,
 					thrust::make_constant_iterator( thrust::make_tuple(cu, cv, cw, Du, Dv, Dw) ),
 					thrust::make_constant_iterator( thrust::make_tuple(c1, c2, c3, c4, c5, c6, c7, c8, c9) ),
 					thrust::make_constant_iterator( thrust::make_tuple(Fmax, Gmax, Hmax) ),
 					thrust::make_zip_iterator(
-						thrust::make_tuple(dxdt.begin() + N, dxdt.begin() + 2 * N, dxdt.end())
+						thrust::make_tuple(dxdt.begin() + N, dxdt.begin() + 2 * N, dxdt.begin() + 3 * N)
 					)
 			) ),
 			sys_functor()
 		);
 	}
+
+	const index_vector_type& get_top() const {return this->top;}
+	const index_vector_type& get_bot() const {return this->bot;}
+	const index_vector_type& get_left() const {return this->left;}
+	const index_vector_type& get_right() const {return this->right;}
+	const size_t& get_N() const {return this->N;}
 
 private:
 
@@ -379,6 +397,89 @@ void gauss_init(std::vector< value_type > &state, const Parameters &params)
     }
 }
 
+void export_neighbors(const rd_dynamics &sys, const Parameters &params)
+{
+	const size_t &N=sys.get_N();
+
+	// Create file
+    generic::DatWriter data_file(params.result_folder + "/neighbors.dat");
+
+	// Write header
+    data_file.write_header("Neighbors", params.Nx, params.Ny, "x", "y", "num", "top_u", "top_v", "top_w", "bot_u", "bot_v", "bot_w", "left_u", "left_v", "left_w", "right_u", "right_v", "right_w");
+
+    // Write data
+    int num=0;
+    for(
+    	auto i=thrust::make_zip_iterator(
+			thrust::make_tuple(
+				thrust::make_zip_iterator(
+					thrust::make_tuple(
+						sys.get_top().begin(),
+						sys.get_top().begin() + N,
+						sys.get_top().begin() + 2 * N
+				) ) ,
+				thrust::make_zip_iterator(
+					thrust::make_tuple(
+						sys.get_bot().begin() ,
+						sys.get_bot().begin() + N ,
+						sys.get_bot().begin() + 2 * N
+				) ) ,
+				thrust::make_zip_iterator(
+					thrust::make_tuple(
+						sys.get_left().begin() ,
+						sys.get_left().begin() + N ,
+						sys.get_left().begin() + 2 * N
+				) ) ,
+				thrust::make_zip_iterator(
+					thrust::make_tuple(
+						sys.get_right().begin() ,
+						sys.get_right().begin() + N ,
+						sys.get_right().begin() + 2 * N
+				) )
+		) );
+		i != thrust::make_zip_iterator(
+			thrust::make_tuple(
+				thrust::make_zip_iterator(
+					thrust::make_tuple(
+						sys.get_top().begin() + N ,
+						sys.get_top().begin() + 2 * N ,
+						sys.get_top().end()
+				) ) ,
+				thrust::make_zip_iterator(
+					thrust::make_tuple(
+						sys.get_bot().begin() + N ,
+						sys.get_bot().begin() + 2 * N ,
+						sys.get_bot().end()
+				) ) ,
+				thrust::make_zip_iterator(
+					thrust::make_tuple(
+						sys.get_left().begin() + N ,
+						sys.get_left().begin() + 2 * N ,
+						sys.get_left().end()
+				) ) ,
+				thrust::make_zip_iterator(
+					thrust::make_tuple(
+						sys.get_right().begin() + N ,
+						sys.get_right().begin() + 2 * N ,
+						sys.get_right().end()
+				) )
+		) );
+		++i
+	)
+    {
+    	const double x = (num % params.Nx) * params.epsilon;
+    	const double y = int(num / params.Nx) * params.epsilon;
+    	data_file.write_row(
+    		x, y, num,
+    		thrust::get<0>(thrust::get<0>(*i)), thrust::get<1>(thrust::get<0>(*i)), thrust::get<2>(thrust::get<0>(*i)),
+    		thrust::get<0>(thrust::get<1>(*i)), thrust::get<1>(thrust::get<1>(*i)), thrust::get<2>(thrust::get<1>(*i)),
+    		thrust::get<0>(thrust::get<2>(*i)), thrust::get<1>(thrust::get<2>(*i)), thrust::get<2>(thrust::get<2>(*i)),
+    		thrust::get<0>(thrust::get<3>(*i)), thrust::get<1>(thrust::get<3>(*i)), thrust::get<2>(thrust::get<3>(*i))
+		);
+    	++num;
+    }
+}
+
 std::vector<value_type> simulate_rd(Parameters &params)
 {
 	// Get values from parameters
@@ -418,6 +519,12 @@ std::vector<value_type> simulate_rd(Parameters &params)
 		Du, Dv, Dw,
 		Fmax, Gmax, Hmax
 	);
+
+	// Export neighbors
+	if(params.export_neighbors)
+	{
+		export_neighbors(sys, params);
+	}
 
 	// Create observer
 	observer obs(params, N);

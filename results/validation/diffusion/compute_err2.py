@@ -36,12 +36,12 @@ for file in os.listdir("results"):
                     4 * comp[1] * (t + np.power(sigma, 2) / (2 * comp[1]))))
 
         # Compute L2 error
-        tmp = []
+        tmp = [t]
         for comp in comps:
             tmp.append(np.sqrt(np.power(data[comp[0]] - data[comp[0] + "_theo"], 2).sum() / np.power(data[comp[0]], 2).sum()))
         errors.append(tmp)
 
 filename = "errors.dat"
 
-err_data = pd.DataFrame(errors, columns=["err2_u", "err2_v", "err2_w"])
-err_data.to_csv(filename, index=False)
+err_data = pd.DataFrame(errors, columns=["t", "err2_u", "err2_v", "err2_w"])
+err_data.sort_values("t").to_csv(filename, index=False)

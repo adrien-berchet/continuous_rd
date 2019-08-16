@@ -61,12 +61,14 @@ public:
 
 		add_param("-delta_obs", "The time step between two consecutive exports", delta_obs, 1, false);
 		add_param("-result_folder", "The folder in which the results are exported", result_folder, 1, true);
+		add_param("-export_neighbors", "Export neighbors for validation", export_neighbors, 1, false);
 	};
 
 	Parameters()
 	{
 		epsilon=1;
 		gauss_std=-1;
+		export_neighbors=false;
 		define_parameters();
 	};
 
@@ -100,6 +102,7 @@ public:
 		gauss_std=a.gauss_std;
 		delta_obs=a.delta_obs;
 		result_folder=a.result_folder;
+		export_neighbors=a.export_neighbors;
 	};
 
 	~Parameters() {};
@@ -129,6 +132,7 @@ public:
 	// IO parameters
 	double delta_obs;
 	std::string result_folder;
+	bool export_neighbors;
 };
 
 #endif
