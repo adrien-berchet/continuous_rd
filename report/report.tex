@@ -9,6 +9,13 @@
 \usepackage{natbib}
 \bibliographystyle{abbrvnat}
 
+\tikzstyle{loosely dashed}=[dash pattern=on 6pt off 6pt]
+\usetikzlibrary{patterns, arrows}
+
+\makeatletter
+\def\pgfplots@drawtickgridlines@INSTALLCLIP@onorientedsurf#1{}
+\makeatother
+
 \begin{document}
 
 \title{Continuous reaction-diffusion process}
@@ -74,6 +81,19 @@ In these conditions, each component should follow the equation \ref{eq:diffusion
 	C_i(r, t)= \dfrac{ \left( 2 \pi \right) ^\frac{N}{2} \sigma^N_i }{ \left[ 4 \pi D_i \left( t + \dfrac{\sigma^2_i}{2D_i} \right) \right]^\frac{N}{2} } \exp \left(- \dfrac{r^2}{4 D_i \left ( t+ \dfrac{\sigma^2_i}{2D_i} \right) } \right)
 \end{align}
 where $C_i(t)$ is the value of the component $i$, $N$ is the number of dimensions (2 in our case), $D_i$ is the diffusion coefficient for the component $i$, $\sigma_i$ is the standard deviation of the gaussian distribution at $t=0$ for the component $i$ and $r$ is the distance from the center of this gaussian distribution.
+
+\begin{figure}
+\begin{tikzpicture}
+	\begin{semilogyaxis}[xlabel="Time (s)", ylabel=$Err_2$, legend pos=south east]
+		\addplot[color=black, solid, mark=none] table[x index=0, y index=1, col sep=comma] {../results/validation/diffusion/errors.dat};
+		\addlegendentry{u component}
+		\addplot[color=black, ultra thick, dashed, mark=none] table[x index=0, y index=2, col sep=comma] {../results/validation/diffusion/errors.dat};
+		\addlegendentry{v component}
+		\addplot[color=black, loosely dashed, mark=none] table[x index=0, y index=3, col sep=comma] {../results/validation/diffusion/errors.dat};
+		\addlegendentry{w component}
+	\end{semilogyaxis}
+\end{tikzpicture}
+\end{figure}
 
 
 \subsection{Decay term}
