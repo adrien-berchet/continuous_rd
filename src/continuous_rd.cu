@@ -15,9 +15,7 @@
 #include "class_parameters.hpp"
 #include "csv_writer.hpp"
 
-using namespace std;
-
-using namespace boost::numeric::odeint;
+namespace ode = boost::numeric::odeint;
 
 
 // Change this to float if your device does not support double computation
@@ -116,19 +114,18 @@ public:
 	};
 
 	rd_dynamics(
-		const state_type &init,
 		const size_t &Nx_in, const size_t &Ny_in,
 		const double &cu_in, const double &cv_in, const double &cw_in,
 		const double &c1_in, const double &c2_in, const double &c3_in, const double &c4_in, const double &c5_in, const double &c6_in, const double &c7_in, const double &c8_in, const double &c9_in,
 		const double &Du_in, const double &Dv_in, const double &Dw_in,
 		const double &Fmax_in, const double &Gmax_in, const double &Hmax_in
 	):
-		state_n (init) , N ( Nx_in * Ny_in ), Nx( Nx_in ), Ny ( Ny_in ),
+		N ( Nx_in * Ny_in ), Nx( Nx_in ), Ny ( Ny_in ),
 		cu(cu_in), cv(cv_in), cw(cw_in),
 		c1(c1_in), c2(c2_in), c3(c3_in), c4(c4_in), c5(c5_in), c6(c6_in), c7(c7_in), c8(c8_in), c9(c9_in),
 		Du(Du_in), Dv(Dv_in), Dw(Dw_in),
 		Fmax(Fmax_in), Gmax(Gmax_in), Hmax(Hmax_in),
-		top( init.size() ), bot( init.size() ), left( init.size() ), right( init.size() )
+		top( 3 * N ), bot( 3 * N ), left( 3 * N ), right( 3 * N )
 	{
 		// Define neighbours
 		thrust::counting_iterator<size_t> counter( 0 );
@@ -244,7 +241,6 @@ public:
 
 private:
 
-	const state_type &state_n;
 	const size_t N, Nx, Ny;
 	const double cu, cv, cw;
 	const double c1, c2, c3, c4, c5, c6, c7, c8, c9;
@@ -292,12 +288,14 @@ struct observer
     template< class State >
     void operator()( const State &state , value_type t )
     {
+    	// TODO: use params.delta_obs to skip some exports if they are too close from each other
+
     	// Format file name (zero padding to ensure that the file are always correctly sorted)
 		std::ostringstream filename;
 		filename << std::fixed << std::setprecision(precision) << std::setw(filename_length) << std::setfill('0') << t;
 
 		// Create file
-        generic::CsvWriter csv_file(params.result_folder + "/results/" + filename.str() + ".dat");
+        generic::CsvWriter csv_file(params.result_folder + "/results/" + filename.str() + ".csv");
 
 		// Write header
         csv_file.write_header("x", "y", "u", "v", "w");
@@ -325,8 +323,57 @@ struct observer
         	++num;
         }
     }
-
 };
+
+/**
+ * \brief Random initialization
+*/
+void random_init(std::vector< value_type > &state, const Parameters &params)
+{}
+
+/**
+ * \brief Gaussian initialization. Only used for validation.
+*/
+void gauss_init(std::vector< value_type > &state, const Parameters &params)
+{
+	const size_t &Nx = params.Nx, &Ny = params.Ny;
+	const size_t N = Nx * Ny;
+
+	const double &epsilon = params.epsilon;
+	const double &sigma = params.gauss_std;
+
+	const double x_center = (Nx / 2.0) * epsilon;
+	const double y_center = (Ny / 2.0) * epsilon;
+
+	std::cout<<"x_center = "<<x_center<<std::endl;
+	std::cout<<"y_center = "<<y_center<<std::endl;
+	std::cout<<"epsilon = "<<epsilon<<std::endl;
+
+    int num=0;
+    for(
+    	auto i=thrust::make_zip_iterator(thrust::make_tuple(
+			state.begin(),
+			state.begin() + N,
+			state.begin() + 2 * N
+		) );
+		i != thrust::make_zip_iterator(thrust::make_tuple(
+			state.begin() + N,
+			state.begin() + 2 * N,
+			state.begin() + 3 * N
+		) );
+		++i
+	)
+    {
+    	const double x = (num % Nx) * epsilon;
+    	const double y = int(num / Nx) * epsilon;
+		const double r = std::sqrt(std::pow(x - x_center, 2.) + std::pow(y - y_center, 2.));
+		const double C = std::exp(-std::pow(r, 2.) / (2. * std::pow(sigma, 2.)));
+    	thrust::get<0>(*i) = C;
+    	thrust::get<1>(*i) = C;
+    	thrust::get<2>(*i) = C;
+    	++num;
+    }
+}
 
 std::vector<value_type> simulate_rd(Parameters &params)
 {
@@ -335,7 +382,6 @@ std::vector<value_type> simulate_rd(Parameters &params)
 	const double &c1=params.c1, &c2=params.c2, &c3=params.c3, &c4=params.c4, &c5=params.c5, &c6=params.c6, &c7=params.c7, &c8=params.c8, &c9=params.c9;
 	const double &Du=params.Du, &Dv=params.Dv, &Dw=params.Dw;
 	const double &Fmax=params.Fmax, &Gmax=params.Gmax, &Hmax=params.Hmax;
-	const double &P=params.P;
 
 	const size_t &Nx = params.Nx, &Ny = params.Ny;
 	const size_t N = Nx * Ny;
@@ -343,29 +389,24 @@ std::vector<value_type> simulate_rd(Parameters &params)
 
 	// Create vectors of data: all variables are concatenated into one vector for simplicity
 	// Create initial conditions and initial values on host
-	vector< value_type > x_host( 4 * N, 0 );
-	vector< value_type > init_host( 4 * N, 0 );
-	for( size_t i=0 ; i<(3 * N) ; ++i )
+	std::vector< value_type > x_host( 4 * N, 0 );
+	if (params.gauss_std > 0)
 	{
-		x_host[i] = 2.0 * drand48();
-		init_host[i] = ( 4 * N - i ); // decreasing frequencies
+		gauss_init(x_host, params);
 	}
-	for( size_t i=3 * N ; i<(4 * N) ; ++i )
+	else
 	{
-		x_host[i] = 1 + P;
-		init_host[i] = 1 + P;
+		random_init(x_host, params);
 	}
 
 	// Copy to device
 	state_type x = x_host;
-	state_type init = init_host;
 
 	// Create stepper
-	runge_kutta4< state_type , value_type , state_type , value_type > stepper;
+	ode::runge_kutta4< state_type , value_type , state_type , value_type > stepper;
 
 	// Create phase oscillator system function
 	rd_dynamics sys(
-		init,
 		Nx, Ny,
 		cu, cv, cw,
 		c1, c2, c3, c4, c5, c6, c7, c8, c9,
@@ -377,6 +418,7 @@ std::vector<value_type> simulate_rd(Parameters &params)
 	observer obs(params, N);
 
 	// Integrate
+	// TODO: Add stoping criteria but Boost::ODEINT does not provide an easy way to do this. I think this should be done inside the observer to interrupt the integration when the criteria is satisfied. Another solution can be to just use do_step() manually.
 	integrate_const( stepper , sys , x , 0.0 , params.tmax , dt , boost::ref(obs));
 
 	// Export results
@@ -389,7 +431,7 @@ int main( int argc , char* argv[] )
 	// Define and read the parameters
 	Parameters params;
 	params.read(argc, argv);
-	cout<<params<<endl;
+	std::cout<<params<<std::endl;
 
 	// Create folders in which the results will be stored
 	if(!boost::filesystem::is_directory(params.result_folder))
@@ -400,8 +442,10 @@ int main( int argc , char* argv[] )
 	{
 		boost::filesystem::create_directories(params.result_folder + "/results");
 	}
+
+	// Export parameters used for the current simulation
 	params.write_parameters(params.result_folder + "/parameters_used.prm");
 
 	// Run the simulation
-	vector<value_type> result = simulate_rd(params);
+	std::vector<value_type> result = simulate_rd(params);
 }
