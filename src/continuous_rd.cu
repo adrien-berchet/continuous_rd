@@ -13,7 +13,7 @@
 #include <boost/numeric/odeint/external/thrust/thrust.hpp>
 
 #include "class_parameters.hpp"
-#include "csv_writer.hpp"
+#include "dat_writer.hpp"
 
 namespace ode = boost::numeric::odeint;
 
@@ -295,10 +295,10 @@ struct observer
 		filename << std::fixed << std::setprecision(precision) << std::setw(filename_length) << std::setfill('0') << t;
 
 		// Create file
-        generic::CsvWriter csv_file(params.result_folder + "/results/" + filename.str() + ".csv");
+        generic::DatWriter data_file(params.result_folder + "/results/" + filename.str() + ".dat");
 
 		// Write header
-        csv_file.write_header("x", "y", "u", "v", "w");
+        data_file.write_header(std::to_string(t), params.Nx, params.Ny, "x", "y", "u", "v", "w", "P_sin_theta");
 
         // Write data
         // TODO: This is the slowest part of the code, try to improve it (I/O are probably limitating but it may be possible to improve the iterators)
@@ -307,19 +307,21 @@ struct observer
         	auto i=thrust::make_zip_iterator(thrust::make_tuple(
 				state.begin(),
 				state.begin() + N,
-				state.begin() + 2 * N
+				state.begin() + 2 * N,
+				state.begin() + 3 * N
 			) );
 			i != thrust::make_zip_iterator(thrust::make_tuple(
 				state.begin() + N,
 				state.begin() + 2 * N,
-				state.begin() + 3 * N
+				state.begin() + 3 * N,
+				state.begin() + 4 * N
 			) );
 			++i
 		)
         {
         	const double x = (num % params.Nx) * params.epsilon;
         	const double y = int(num / params.Nx) * params.epsilon;
-        	csv_file.write_row(x, y, thrust::get<0>(*i), thrust::get<1>(*i), thrust::get<2>(*i));
+        	data_file.write_row(x, y, thrust::get<0>(*i), thrust::get<1>(*i), thrust::get<2>(*i), thrust::get<3>(*i));
         	++num;
         }
     }
@@ -345,9 +347,11 @@ void gauss_init(std::vector< value_type > &state, const Parameters &params)
 	const double x_center = (Nx / 2.0) * epsilon;
 	const double y_center = (Ny / 2.0) * epsilon;
 
-	std::cout<<"x_center = "<<x_center<<std::endl;
-	std::cout<<"y_center = "<<y_center<<std::endl;
-	std::cout<<"epsilon = "<<epsilon<<std::endl;
+	std::cout<<"Gaussian initialization:"<<std::endl;
+	std::cout<<"\t x_center = "<<x_center<<std::endl;
+	std::cout<<"\t y_center = "<<y_center<<std::endl;
+	std::cout<<"\t epsilon = "<<epsilon<<std::endl;
+	std::cout<<"\t std = "<<sigma<<std::endl;
 
     int num=0;
     for(
@@ -390,6 +394,7 @@ std::vector<value_type> simulate_rd(Parameters &params)
 	// Create vectors of data: all variables are concatenated into one vector for simplicity
 	// Create initial conditions and initial values on host
 	std::vector< value_type > x_host( 4 * N, 0 );
+    std::fill(x_host.begin() + 3 * N, x_host.end(), 1.0); // Set P sin(theta) = 1 everywhere
 	if (params.gauss_std > 0)
 	{
 		gauss_init(x_host, params);
