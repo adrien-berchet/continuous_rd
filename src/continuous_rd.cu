@@ -1,5 +1,7 @@
-#include <iostream>
 #include <cmath>
+#include <iostream>
+#include <sstream>
+#include <iomanip>
 
 #include <thrust/device_vector.h>
 #include <thrust/iterator/permutation_iterator.h>
@@ -11,13 +13,14 @@
 #include <boost/numeric/odeint/external/thrust/thrust.hpp>
 
 #include "class_parameters.hpp"
+#include "csv_writer.hpp"
 
 using namespace std;
 
 using namespace boost::numeric::odeint;
 
 
-// change this to float if your device does not support double computation
+// Change this to float if your device does not support double computation
 typedef double value_type;
 
 
@@ -30,6 +33,9 @@ typedef thrust::host_vector< size_t > index_vector_type;
 #endif
 
 
+/**
+ * \brief Define the dynamic system
+*/
 class rd_dynamics
 {
 
@@ -39,41 +45,41 @@ public:
 	{
 		template< class Tuple >
 		__host__ __device__
-		void operator()( Tuple t )  // this functor works on tuples of values
+		void operator()( Tuple t )  // This functor works on tuples of values
 		{
-			// get current values
+			// Get current values
 			const value_type u = thrust::get<0>(thrust::get<0>(t));
 			const value_type v = thrust::get<1>(thrust::get<0>(t));
 			const value_type w = thrust::get<2>(thrust::get<0>(t));
 
-			// get P sin(theta)
+			// Get P sin(theta)
 			const value_type P_sin_theta = thrust::get<3>(thrust::get<0>(t));
 
-			// get neighbors
-			const value_type u_top = thrust::get<0>(thrust::get<1>(t));  // top neighbor for u
-			const value_type v_top = thrust::get<1>(thrust::get<1>(t));  // top neighbor for v
-			const value_type w_top = thrust::get<2>(thrust::get<1>(t));  // top neighbor for w
-			const value_type u_bot = thrust::get<0>(thrust::get<2>(t));  // bottom neighbor for u
-			const value_type v_bot = thrust::get<1>(thrust::get<2>(t));  // bottom neighbor for v
-			const value_type w_bot = thrust::get<2>(thrust::get<2>(t));  // bottom neighbor for w
-			const value_type u_left = thrust::get<0>(thrust::get<3>(t));  // left neighbor for u
-			const value_type v_left = thrust::get<1>(thrust::get<3>(t));  // left neighbor for v
-			const value_type w_left = thrust::get<2>(thrust::get<3>(t));  // left neighbor for w
-			const value_type u_right = thrust::get<0>(thrust::get<4>(t)); // right neighbor for u
-			const value_type v_right = thrust::get<1>(thrust::get<4>(t)); // right neighbor for v
-			const value_type w_right = thrust::get<2>(thrust::get<4>(t)); // right neighbor for w
+			// Get neighbors
+			const value_type u_top = thrust::get<0>(thrust::get<1>(t));  // Top neighbor for u
+			const value_type v_top = thrust::get<1>(thrust::get<1>(t));  // Top neighbor for v
+			const value_type w_top = thrust::get<2>(thrust::get<1>(t));  // Top neighbor for w
+			const value_type u_bot = thrust::get<0>(thrust::get<2>(t));  // Bottom neighbor for u
+			const value_type v_bot = thrust::get<1>(thrust::get<2>(t));  // Bottom neighbor for v
+			const value_type w_bot = thrust::get<2>(thrust::get<2>(t));  // Bottom neighbor for w
+			const value_type u_left = thrust::get<0>(thrust::get<3>(t));  // Left neighbor for u
+			const value_type v_left = thrust::get<1>(thrust::get<3>(t));  // Left neighbor for v
+			const value_type w_left = thrust::get<2>(thrust::get<3>(t));  // Left neighbor for w
+			const value_type u_right = thrust::get<0>(thrust::get<4>(t)); // Right neighbor for u
+			const value_type v_right = thrust::get<1>(thrust::get<4>(t)); // Right neighbor for v
+			const value_type w_right = thrust::get<2>(thrust::get<4>(t)); // Right neighbor for w
 
-			// get cu, cv, cw
+			// Get cu, cv, cw
 			const value_type cu = thrust::get<0>(thrust::get<5>(t));
 			const value_type cv = thrust::get<1>(thrust::get<5>(t));
 			const value_type cw = thrust::get<2>(thrust::get<5>(t));
 
-			// get Du, Dv, Dw
+			// Get Du, Dv, Dw
 			const value_type Du = thrust::get<3>(thrust::get<5>(t));
 			const value_type Dv = thrust::get<4>(thrust::get<5>(t));
 			const value_type Dw = thrust::get<5>(thrust::get<5>(t));
 
-			// get c1, c2, ..., c9
+			// Get c1, c2, ..., c9
 			const value_type c1 = thrust::get<0>(thrust::get<6>(t));
 			const value_type c2 = thrust::get<1>(thrust::get<6>(t));
 			const value_type c3 = thrust::get<2>(thrust::get<6>(t));
@@ -84,12 +90,12 @@ public:
 			const value_type c8 = thrust::get<7>(thrust::get<6>(t));
 			const value_type c9 = thrust::get<8>(thrust::get<6>(t));
 
-			// get Fmax, Gmax, Hmax
+			// Get Fmax, Gmax, Hmax
 			const value_type Fmax = thrust::get<0>(thrust::get<7>(t));
 			const value_type Gmax = thrust::get<1>(thrust::get<7>(t));
 			const value_type Hmax = thrust::get<2>(thrust::get<7>(t));
 
-			// compute each term for each component
+			// Compute each term for each component
 			const value_type F_cond = c1 * v + c2 * w + c3;
 			const value_type G_cond = c4 * u + c5 * w + c6;
 			const value_type H_cond = c7 * u + c8 * v + c9;
@@ -102,7 +108,7 @@ public:
 			const value_type lapl_v = v_top + v_bot + v_left + v_right - 4 * v;
 			const value_type lapl_w = w_top + w_bot + w_left + w_right - 4 * w;
 
-			// the dynamical equation
+			// The dynamical equation
 			thrust::get<0>(thrust::get<8>(t)) = F - cu * u + Du * lapl_u * P_sin_theta;
 			thrust::get<1>(thrust::get<8>(t)) = G - cv * v + Dv * lapl_v * P_sin_theta;
 			thrust::get<2>(thrust::get<8>(t)) = H - cw * w + Dw * lapl_w * P_sin_theta;
@@ -124,24 +130,24 @@ public:
 		Fmax(Fmax_in), Gmax(Gmax_in), Hmax(Hmax_in),
 		top( init.size() ), bot( init.size() ), left( init.size() ), right( init.size() )
 	{
-		// define neighbours
+		// Define neighbours
 		thrust::counting_iterator<size_t> counter( 0 );
 
-		// top neighbours
+		// Top neighbours
 		thrust::copy( counter , counter+(N-Nx) , top.begin()+Nx );
 		thrust::copy( counter+(N-Nx), counter+N , top.begin() );
 
-		// bottom neighbours
+		// Bottom neighbours
 		thrust::copy( counter+Nx , counter+N , bot.begin() );
 		thrust::copy( counter, counter+Nx , bot.begin()+N-Nx );
 
-		// left neighbours
+		// Left neighbours
 		thrust::copy( counter , counter+N-1 , left.begin()+1 );
 
-		// right neighbours
+		// Right neighbours
 		thrust::copy( counter+1 , counter+N , right.begin() );
 
-		// adjust left and right neighbours on sides
+		// Adjust left and right neighbours on sides
 		for (int i = 0; i < Ny; ++i)
 		{
 			left[i * Nx] = i * Nx - 1;
@@ -247,38 +253,96 @@ private:
 	index_vector_type top, bot, left, right;
 };
 
+/**
+ * \brief Compute the max length of the file names
+*/
+template<typename T>
+size_t number_length(T &tmax, T &dt)
+{
+	std::ostringstream tmp;
+	double int_part;
+	double decimal_part = std::modf(tmax, &int_part);
+	tmp << int_part + dt;
+	return tmp.str().size();
+}
+
+/**
+ * \brief Compute the max length of the decimal part of the file names
+*/
+template<typename T>
+size_t number_precision(T &dt)
+{
+	std::ostringstream tmp;
+	tmp << dt;
+	return std::max(size_t(3), tmp.str().size()) - 2;
+}
+
+/**
+ * \brief Define the observer used to export the results
+*/
 struct observer
 {
-    value_type m_K_mean;
-    size_t m_count;
+    const Parameters &params;
+    const size_t N;
+    const size_t filename_length;
+    const size_t precision;
 
-    observer( void ) { }
+    observer( const Parameters &params_in, const size_t &N_in ) : params( params_in ), N( N_in ), filename_length( number_length(params.tmax, params.dt) ), precision( number_precision(params.dt) ) {}
 
     template< class State >
-    void operator()( const State &x , value_type t )
+    void operator()( const State &state , value_type t )
     {
-    	std::cout<<"t="<<t<<"s"<<std::endl;
-    	thrust::copy( x.begin() , x.begin() + 10 , std::ostream_iterator< value_type >( std::cout , "\n" ) );
-    	std::cout<<std::endl<<std::endl;
+    	// Format file name (zero padding to ensure that the file are always correctly sorted)
+		std::ostringstream filename;
+		filename << std::fixed << std::setprecision(precision) << std::setw(filename_length) << std::setfill('0') << t;
+
+		// Create file
+        generic::CsvWriter csv_file(params.result_folder + "/results/" + filename.str() + ".dat");
+
+		// Write header
+        csv_file.write_header("x", "y", "u", "v", "w");
+
+        // Write data
+        // TODO: This is the slowest part of the code, try to improve it (I/O are probably limitating but it may be possible to improve the iterators)
+        int num=0;
+        for(
+        	auto i=thrust::make_zip_iterator(thrust::make_tuple(
+				state.begin(),
+				state.begin() + N,
+				state.begin() + 2 * N
+			) );
+			i != thrust::make_zip_iterator(thrust::make_tuple(
+				state.begin() + N,
+				state.begin() + 2 * N,
+				state.begin() + 3 * N
+			) );
+			++i
+		)
+        {
+        	const double x = (num % params.Nx) * params.epsilon;
+        	const double y = int(num / params.Nx) * params.epsilon;
+        	csv_file.write_row(x, y, thrust::get<0>(*i), thrust::get<1>(*i), thrust::get<2>(*i));
+        	++num;
+        }
     }
 
 };
 
 std::vector<value_type> simulate_rd(Parameters &params)
 {
-	// get values from parameters
-	const double cu=params.cu, cv=params.cv, cw=params.cw;
-	const double c1=params.c1, c2=params.c2, c3=params.c3, c4=params.c4, c5=params.c5, c6=params.c6, c7=params.c7, c8=params.c8, c9=params.c9;
-	const double Du=params.Du, Dv=params.Dv, Dw=params.Dw;
-	const double Fmax=params.Fmax, Gmax=params.Gmax, Hmax=params.Hmax;
-	const double P=params.P;
+	// Get values from parameters
+	const double &cu=params.cu, &cv=params.cv, &cw=params.cw;
+	const double &c1=params.c1, &c2=params.c2, &c3=params.c3, &c4=params.c4, &c5=params.c5, &c6=params.c6, &c7=params.c7, &c8=params.c8, &c9=params.c9;
+	const double &Du=params.Du, &Dv=params.Dv, &Dw=params.Dw;
+	const double &Fmax=params.Fmax, &Gmax=params.Gmax, &Hmax=params.Hmax;
+	const double &P=params.P;
 
-	const size_t Nx = params.Nx, Ny = params.Ny;
+	const size_t &Nx = params.Nx, &Ny = params.Ny;
 	const size_t N = Nx * Ny;
-	const value_type dt = params.dt;
+	const value_type &dt = params.dt;
 
-	// create vectors of data: all variables are concatenated into one vector for simplicity
-	// create initial conditions and initial values on host:
+	// Create vectors of data: all variables are concatenated into one vector for simplicity
+	// Create initial conditions and initial values on host
 	vector< value_type > x_host( 4 * N, 0 );
 	vector< value_type > init_host( 4 * N, 0 );
 	for( size_t i=0 ; i<(3 * N) ; ++i )
@@ -292,14 +356,14 @@ std::vector<value_type> simulate_rd(Parameters &params)
 		init_host[i] = 1 + P;
 	}
 
-	// copy to device
+	// Copy to device
 	state_type x = x_host;
 	state_type init = init_host;
 
-	// create stepper
+	// Create stepper
 	runge_kutta4< state_type , value_type , state_type , value_type > stepper;
 
-	// create phase oscillator system function
+	// Create phase oscillator system function
 	rd_dynamics sys(
 		init,
 		Nx, Ny,
@@ -309,31 +373,35 @@ std::vector<value_type> simulate_rd(Parameters &params)
 		Fmax, Gmax, Hmax
 	);
 
-	// create observer
-	observer obs;
+	// Create observer
+	observer obs(params, N);
 
-	// integrate
+	// Integrate
 	integrate_const( stepper , sys , x , 0.0 , params.tmax , dt , boost::ref(obs));
 
+	// Export results
 	thrust::copy( x.begin() , x.end() , x_host.begin() );
 	return x_host;
 }
 
 int main( int argc , char* argv[] )
 {
+	// Define and read the parameters
 	Parameters params;
 	params.read(argc, argv);
 	cout<<params<<endl;
 
+	// Create folders in which the results will be stored
 	if(!boost::filesystem::is_directory(params.result_folder))
 	{
 		boost::filesystem::create_directories(params.result_folder);
 	}
+	if(!boost::filesystem::is_directory(params.result_folder + "/results"))
+	{
+		boost::filesystem::create_directories(params.result_folder + "/results");
+	}
 	params.write_parameters(params.result_folder + "/parameters_used.prm");
 
+	// Run the simulation
 	vector<value_type> result = simulate_rd(params);
-
-	// print some results
-	std::copy( result.begin() , result.begin() + 10 , std::ostream_iterator< value_type >( std::cout , "\n" ) );
-	std::cout << std::endl;
 }

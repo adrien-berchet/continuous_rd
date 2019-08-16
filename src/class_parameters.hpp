@@ -48,14 +48,15 @@ public:
 		add_param("-Nx", "The grid size along X axis", Nx, 1, true);
 		add_param("-Ny", "The grid size along X axis", Ny, 1, true);
 		add_param("-dt", "The time step", dt, 1, true);
-		add_param("-epsilon", "The coefficient epsilon", epsilon, 1, true);
+		add_param("-epsilon", "The coefficient epsilon", epsilon, 1, false);
 		add_param("-S", "The hexagon side length (the lattice is not generated if this argument is not provided)", S, 1, false);
-		add_param("-delta_obs", "The time step between two consecutive exports", delta_obs, 1, true);
+		add_param("-delta_obs", "The time step between two consecutive exports", delta_obs, 1, false);
 		add_param("-result_folder", "The folder in which the results are exported", result_folder, 1, true);
 	};
 
 	Parameters()
 	{
+		epsilon=1;
 		define_parameters();
 	};
 
