@@ -1,12 +1,12 @@
-# Diffusion parameters
+# Decay parameters
 -cu
-0.0
+0.02
 
 -cv
-0.0
+0.025
 
 -cw
-0.0
+0.06
 
 -c1
 0.0
@@ -36,13 +36,13 @@
 0.0
 
 -Du
-1.125
+0.0
 
 -Dv
-1.125
+0.0
 
 -Dw
-13.5
+0.0
 
 -Fmax
 0.5
