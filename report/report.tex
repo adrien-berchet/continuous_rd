@@ -5,6 +5,7 @@
 \usepackage{amsfonts}
 \usepackage{xcolor}
 \usepackage[detect-all]{siunitx}
+\usepackage{floatrow}
 \usepackage{pgfplots}
 \usepackage{natbib}
 \bibliographystyle{abbrvnat}
@@ -63,7 +64,7 @@ This model is implemented on a $2000 \times 380$ square lattice with step $\epsi
 
 \section{Code implementation details}
 
-The code implementation was guided by the short delay and by the computation time. The delay did not allow to test several libraries so a low level approach was chosen. This choice seems reasonable since only low order laplacian calculation is targeted, so the neighborhoods are quite easy to implement. Furthermore, because of the quite large number of numerical elements, parallele computation is required in order to obtain the results in a decent time. The library Boost::ODEINT, which aims to solve ordinary differential equations, can be coupled with the Thrust library witch is meant to use the GPU for calculation. The Boost::ODEINT library was chosen for its simplicity and its simplicity and because it is very convenient to switch from a numerical scheme to another. In this work, the Runge-Kutta 4 scheme is used. Also, this library has simple mechanisms to monitor temporary results.
+The code implementation was guided by the short delay and by the computation time. The delay did not allow to test several libraries so a low level approach was chosen. This choice seems reasonable since only low order laplacian calculation is targeted, so the neighborhoods are quite easy to implement. Furthermore, because of the quite large number of numerical elements, parallele computation is required in order to obtain the results in a decent time. The library Boost::ODEINT, which aims to solve ordinary differential equations, can be coupled with the Thrust library witch is meant to use the GPU for calculation. The Boost::ODEINT library was chosen for its simplicity and its simplicity and because it is very convenient to switch from a numerical scheme to another. In this work, the Runge-Kutta 4 scheme is used. Also, this library has simple mechanisms to monitor temporary results. The main drawback of this library is that it does not provide simple way to implement stopping criteria, so a manual implementation would be needed. This last point is not yet implemented in this work due to the short delay.
 
 Hexagonal lattice generation
 Data storing
@@ -73,22 +74,30 @@ For the sake of simplicity, the results are stored in ASCII files (see format de
 
 \section{Validation}
 
-The right-hand side of each component contains 3 terms: an interaction term, a decay term and a diffusion term. The interaction term acts like a source or a sink, depending on the other component values. This first term calculation is trivial and behaves like a dynamic decay term (though it might also increase instead of only decrease), so it is not specifically validated in this report. The two other decay and diffusion terms are validated by comparing their results to analytical values for simple setups that are presented in the following subsections.
+The right-hand side of each component contains 3 terms: an interaction term, a decay term and a diffusion term. The interaction term acts like a source or a sink, depending on the other component values. This first term calculation is trivial and behaves like a dynamic decay term (though it might also increase instead of only decrease), so it is not specifically validated in this report. The two other decay and diffusion terms are validated by comparing their results to analytical values for simple setups that are presented in the following subsections. For each validation process, the results are compared to analytical solutions using a L2-norm error (or least squares error) which is defined by equation \ref{eq:l2-error}.
+
+\begin{align}
+\label{eq:l2-error}
+	Err_2(x)= \sqrt{\dfrac{\sum_k \left( x_k - x'_k \right)^2}{\sum_k x'^2_k}}
+\end{align}
+where $x_k$ is the measured value and $x'_k$ is the expected value.
 
 \subsection{Diffusion term}
 
-The right-hand side of each component contains a diffusion term for which the analytical solution is known. It is thus possible to validate this term by setting all other terms to zero and by comparing the dynamics to the analytical solution. In this model, a simple diffusion process is obtained if the following constants are set to zero: $c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_u, c_v$ and $c_w$.
+The right-hand side of each component contains a diffusion term which is the most complicated to model and for which the analytical solution is known. It is thus possible to validate this term by setting all other terms to zero and by comparing the dynamics to the analytical solution. In this model, a simple diffusion process is obtained if the following constants are set to zero: $c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_u, c_v$ and $c_w$.
 Also, the term $P \sin (\theta)$ is ignored in this validation process.
 
-In these conditions, each component should follow the equation \ref{eq:diffusion}. for this validation process, the diffusion coefficients are set to the values that will be used later.
-
+In these conditions, each component should follow the equation \ref{eq:diffusion}. For this validation process, the diffusion coefficients are set to the values that will be used in the later work.
 \begin{align}
 \label{eq:diffusion}
-	C_i(r, t)= \dfrac{ \left( 2 \pi \right) ^\frac{N}{2} \sigma^N_i }{ \left[ 4 \pi D_i \left( t + \dfrac{\sigma^2_i}{2D_i} \right) \right]^\frac{N}{2} } \exp \left(- \dfrac{r^2}{4 D_i \left ( t+ \dfrac{\sigma^2_i}{2D_i} \right) } \right)
+	C_i(r, t)= \dfrac{ \left( 2 \pi \right) ^\frac{N}{2} \sigma^N_i }{ \left[ 4 \pi D_i \left( t + \dfrac{\sigma^2_i}{2D_i} \right) \right]^\frac{N}{2} } \exp \left(- \dfrac{r^2}{4 D_i \left ( t + \dfrac{\sigma^2_i}{2D_i} \right) } \right)
 \end{align}
 where $C_i(t)$ is the value of the component $i$, $N$ is the number of dimensions (2 in our case), $D_i$ is the diffusion coefficient for the component $i$, $\sigma_i$ is the standard deviation of the gaussian distribution at $t=0$ for the component $i$ and $r$ is the distance from the center of this gaussian distribution.
 
+The diffusion process simulated for validation uses an initial gaussian distribution with $\sigma = 5$, $\epsilon = 1$ and a 2D grid with $128 \times 64$ elements. Ths diffusion coefficients are $D_u = D_v = 1.125$ and $D_w = 13.5$. The figure \ref{fig:err2-diffusion} presents the $L_2$ error of this diffusion process and show a good adequacy of the results with the expected values since the error converges to $Err_2 ~ 10^{-3}$. The increasing error starting at $t~2s$ for the component $w$ is only due to the small size of the grid combined with periodic boundary conditions, since the theoretical values do not consider these boundary conditions.
+
 \begin{figure}
+\label{fig:err2-diffusion}
 \begin{tikzpicture}
 	\begin{semilogyaxis}[xlabel=Time (s), ylabel=$Err_2$, legend pos=south east]
 		\addplot[color=black, solid, mark=none] table[x index=0, y index=1, col sep=comma] {../results/validation/diffusion/errors_diffusion.dat};
@@ -105,9 +114,18 @@ where $C_i(t)$ is the value of the component $i$, $N$ is the number of dimension
 
 \subsection{Decay term}
 
-The decay coefficients are set to the values that will be used later.
+The second term of the right-hand side of each component is a decay term for which the analytical solution is also known. This decay process can thus be validated by setting the following constants to zero, so that the process is isolated from the others: $c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, D_u, D_v$ and $D_w$. Also, in order to validate that the process works properly for a wide range of values, the process used for validation starts from the same gaussian distribution and the same setup as for the diffusion process validation.
+
+In these conditions, each component should follow the equation \ref{eq:decay}. For this validation process, the decay coefficients are set to the values that will be used in the later work.
+\begin{align}
+\label{eq:decay}
+	C_i(r, t)= \exp \left(- \dfrac{r^2}{2 \sigma^2_i} \right) \times exp(-c_i t)
+\end{align}
+
+The figure \ref{fig:err2-decay} presents the $L_2$ error of this decay process and show a very good adequacy of the results with the expected values since the error increases very slowly from $Err_2 ~ 10^{-6.2}$ to $Err_2 ~ 10^{-5.8}$ in the worst case ($w$ component).
 
 \begin{figure}
+\label{fig:err2-decay}
 \begin{tikzpicture}
 	\begin{semilogyaxis}[xlabel=Time (s), ylabel=$Err_2$, legend pos=north west]
 		\addplot[color=black, solid, mark=none] table[x index=0, y index=1, col sep=comma] {../results/validation/decay/errors_decay.dat};
