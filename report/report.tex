@@ -63,18 +63,24 @@ This model is implemented on a $2000 \times 380$ square lattice with step $\epsi
 
 \section{Code implementation details}
 
-The code implementation was guided by the short delay and by the computation time. The delay did not allow to test several libraries so a low level approach was chosen. Furthermore, because of the quite large number of numerical elements, parallele computation is required in order to obtain the results in a decent time. The library Boost::ODEINT, which aims to solve ordinary differential equations, can be coupled with the Thrust library witch is meant to use the GPU for calculation. The Boost::ODEINT library was chosen for its simplicity and its simplicity and because it is very convenient to switch from a numerical scheme to another. In this work, the Runge-Kutta 4 scheme is used. Also, this library has simple mechanisms to monitor temporary results.
+The code implementation was guided by the short delay and by the computation time. The delay did not allow to test several libraries so a low level approach was chosen. This choice seems reasonable since only low order laplacian calculation is targeted, so the neighborhoods are quite easy to implement. Furthermore, because of the quite large number of numerical elements, parallele computation is required in order to obtain the results in a decent time. The library Boost::ODEINT, which aims to solve ordinary differential equations, can be coupled with the Thrust library witch is meant to use the GPU for calculation. The Boost::ODEINT library was chosen for its simplicity and its simplicity and because it is very convenient to switch from a numerical scheme to another. In this work, the Runge-Kutta 4 scheme is used. Also, this library has simple mechanisms to monitor temporary results.
+
+Hexagonal lattice generation
+Data storing
+Post-process scripts in Python
+
+For the sake of simplicity, the results are stored in ASCII files (see format details in 4.3 of \cite{tecplot_dataformat_guide}) at given time steps. Then these files are post-processed using Python scripts in order to compare them to analytical solutions, to display the dynamics of a given set of elements or to transform the results in images.
 
 \section{Validation}
 
-The right-hand side of each component contains 3 terms: an interaction term, a decay term and a diffusion term. The interaction term acts like a source or a sink, depending on the other component values. This first term is trivial and is not validated in this report. The two other decay and diffusion terms are validated by comparing to analytical values for simple setups that are presented in the following subsections.
+The right-hand side of each component contains 3 terms: an interaction term, a decay term and a diffusion term. The interaction term acts like a source or a sink, depending on the other component values. This first term calculation is trivial and behaves like a dynamic decay term (though it might also increase instead of only decrease), so it is not specifically validated in this report. The two other decay and diffusion terms are validated by comparing their results to analytical values for simple setups that are presented in the following subsections.
 
 \subsection{Diffusion term}
 
 The right-hand side of each component contains a diffusion term for which the analytical solution is known. It is thus possible to validate this term by setting all other terms to zero and by comparing the dynamics to the analytical solution. In this model, a simple diffusion process is obtained if the following constants are set to zero: $c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_u, c_v$ and $c_w$.
 Also, the term $P \sin (\theta)$ is ignored in this validation process.
 
-In these conditions, each component should follow the equation \ref{eq:diffusion}.
+In these conditions, each component should follow the equation \ref{eq:diffusion}. for this validation process, the diffusion coefficients are set to the values that will be used later.
 
 \begin{align}
 \label{eq:diffusion}
@@ -99,7 +105,7 @@ where $C_i(t)$ is the value of the component $i$, $N$ is the number of dimension
 
 \subsection{Decay term}
 
-The 
+The decay coefficients are set to the values that will be used later.
 
 \begin{figure}
 \begin{tikzpicture}
@@ -116,6 +122,10 @@ The
 \end{figure}
 
 \section{Results}
+
+\section{Perspectives}
+
+The ASCII file format is not efficient and the result export is very slow. A strong improvement of this process could consist in using binary file format.
 
 \bibliography{biblio.bib}
 

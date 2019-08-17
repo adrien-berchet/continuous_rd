@@ -319,7 +319,7 @@ struct observer
         data_file.write_header(std::to_string(t), params.Nx, params.Ny, "x", "y", "u", "v", "w", "P_sin_theta");
 
         // Write data
-        // TODO: This is the slowest part of the code, try to improve it (I/O are probably limitating but it may be possible to improve the iterators)
+        // TODO: This is the slowest part of the code, try to improve it either by using binary files or by improving the iterators (but I/O are probably the main limitation)
         int num=0;
         for(
         	auto i=thrust::make_zip_iterator(thrust::make_tuple(
