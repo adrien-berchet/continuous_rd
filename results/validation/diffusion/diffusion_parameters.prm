@@ -67,3 +67,6 @@
 
 -tmax
 20.0
+
+-gauss_std
+5
