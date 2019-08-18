@@ -57,6 +57,8 @@ public:
 		add_param("-delta_obs", "The time step between two consecutive exports", delta_obs, 1, false);
 		add_param("-result_folder", "The folder in which the results are exported", result_folder, 1, true);
 		add_param("-export_neighbors", "Export neighbors for validation", export_neighbors, 1, false);
+
+		add_param("-log_level", "Level of logger verbosity (must be one of 'trace', 'debug', 'info', 'warning', 'error', 'fatal' or 'quiet')", log_level, 1, false);
 	};
 
 	Parameters()
@@ -65,6 +67,7 @@ public:
 		S=20. / sqrt(3.0);
 		gauss_std=-1;
 		export_neighbors=false;
+		log_level="debug";
 		define_parameters();
 	};
 
@@ -99,6 +102,7 @@ public:
 		delta_obs=a.delta_obs;
 		result_folder=a.result_folder;
 		export_neighbors=a.export_neighbors;
+		log_level=a.log_level;
 	};
 
 	~Parameters() {};
@@ -129,6 +133,7 @@ public:
 	double delta_obs;
 	std::string result_folder;
 	bool export_neighbors;
+	std::string log_level;
 };
 
 #endif

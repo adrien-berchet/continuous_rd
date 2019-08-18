@@ -24,16 +24,14 @@ ENDIF( PROFILING )
 TARGET_LINK_LIBRARIES(continuous_rd.exe
                       m
                       stdc++
-                      boost_system
                       boost_chrono
-                      boost_timer
                       boost_filesystem
+                      boost_log
+                      boost_log_setup
+                      boost_system
+                      boost_thread
+                      boost_timer
+                      pthread
                       )
-
-IF(THREAD)
-    TARGET_LINK_LIBRARIES(continuous_rd.exe
-                          pthread
-                          )
-ENDIF(THREAD)
 
 INSTALL (TARGETS continuous_rd.exe DESTINATION bin)

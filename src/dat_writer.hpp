@@ -139,6 +139,7 @@ namespace generic
          * \param cols Column names.
         */
         template <typename ...ColNames>
+        inline
         void write_row(ColNames... cols)
         {
             std::string n = std::to_string(sizeof...(cols));
@@ -172,6 +173,7 @@ namespace generic
          * \remark This function should be only called by the function write_header.
         */
         template <typename ...ColNames>
+        inline
         void write_header_sub(const std::string& col, ColNames... cols)
         {
             _file<<"\""<<col<<"\""<<_delimiter;
@@ -184,6 +186,7 @@ namespace generic
          * \param col Column name currently processed.
          * \remark This function should be only called by the function write_header.
         */
+        inline
         void write_header_sub(const std::string& col)
         {
             _file<<"\""<<col<<"\""<<std::endl;
@@ -197,6 +200,7 @@ namespace generic
          * \remark This function should be only called by the function write_header.
         */
         template <typename T, typename ...ColNames>
+        inline
         void write_row_sub(const T& col, ColNames... cols)
         {
             _file<<col<<_delimiter;
@@ -209,6 +213,7 @@ namespace generic
          * \remark This function should be only called by the function write_header.
         */
         template <typename T>
+        inline
         void write_row_sub(const T& col)
         {
             _file<<col<<std::endl;

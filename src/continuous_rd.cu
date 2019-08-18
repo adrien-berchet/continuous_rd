@@ -1,3 +1,5 @@
+#define BOOST_LOG_DYN_LINK 1
+
 #include <cmath>
 #include <iostream>
 #include <sstream>
@@ -12,8 +14,10 @@
 #include <boost/numeric/odeint/integrate/integrate_const.hpp>
 #include <boost/numeric/odeint/external/thrust/thrust.hpp>
 
-#include "class_parameters.hpp"
 #include "dat_writer.hpp"
+#include "logger.hpp"
+
+#include "class_parameters.hpp"
 
 namespace ode = boost::numeric::odeint;
 
@@ -164,6 +168,8 @@ public:
 		top( 3 * N ), bot( 3 * N ), left( 3 * N ), right( 3 * N ),
 		Pxx_top( Pxx_top_in ), Pxx_bot( Pxx_bot_in ), Pxx_left( Pxx_left_in ), Pxx_right( Pxx_right_in )
 	{
+		BOOST_LOG_TRIVIAL(debug) << "RD dynamics initialization";
+
 		// Define neighbors
 		thrust::counting_iterator<size_t> counter( 0 );
 
@@ -201,8 +207,9 @@ public:
 		}
 	}
 
-	void operator() ( const state_type &x , state_type &dxdt , const value_type )
+	void operator() ( const state_type &x , state_type &dxdt , const value_type &t)
 	{
+		BOOST_LOG_TRIVIAL(debug) << "Compute dynamics for t="<<t;
 		thrust::for_each(
 			thrust::make_zip_iterator(
 				thrust::make_tuple(
@@ -356,6 +363,7 @@ struct observer
 	const size_t filename_length;
 	const size_t precision;
 	const state_type &Pxx_top, &Pxx_bot, &Pxx_left, &Pxx_right;
+	double last_t;
 
 
 	observer(
@@ -369,19 +377,33 @@ struct observer
 		filename_length( number_length(params.tmax, params.dt) ),
 		precision( number_precision(params.dt) ),
 		Pxx_top( Pxx_top_in ), Pxx_bot( Pxx_bot_in ), Pxx_left( Pxx_left_in ), Pxx_right( Pxx_right_in )
-	{}
+	{
+		BOOST_LOG_TRIVIAL(debug) << "Observer initialization";
+		last_t = -1;
+	}
 
 	template< class State >
 	void operator()( const State &state , value_type t )
 	{
 		// TODO: use params.delta_obs to skip some exports if they are too close from each other
+		if(t - last_t < params.delta_obs || t >= params.tmax - params.dt)
+		{
+			BOOST_LOG_TRIVIAL(debug) << "Skip export results for t="<<t;
+			return;
+		}
+		else
+		{
+			last_t = t;
+		}
 
 		// Format file name (zero padding to ensure that the file are always correctly sorted)
 		std::ostringstream filename;
-		filename << std::fixed << std::setprecision(precision) << std::setw(filename_length) << std::setfill('0') << t;
+		filename << std::fixed << std::setprecision(precision) << std::setw(filename_length) << std::setfill('0') << t << ".dat";
+
+		BOOST_LOG_TRIVIAL(info) << "Export results for t="<<t<<" in "<<filename.str();
 
 		// Create file
-		generic::DatWriter data_file(params.result_folder + "/results/" + filename.str() + ".dat");
+		generic::DatWriter data_file(params.result_folder + "/results/" + filename.str());
 
 		// Write header
 		data_file.write_header(std::to_string(t), params.Nx, params.Ny, "x", "y", "u", "v", "w", "P_sin_theta_top", "P_sin_theta_bot", "P_sin_theta_left", "P_sin_theta_right");
@@ -438,11 +460,11 @@ void random_init(std::vector< value_type > &state, const Parameters &params, std
 	const double &epsilon = params.epsilon;
 	const double &S = params.S;
 
-	std::cout<<"Random initialization:"<<std::endl;
-	std::cout<<"\t Nx = "<<Nx<<std::endl;
-	std::cout<<"\t Ny = "<<Ny<<std::endl;
-	std::cout<<"\t epsilon = "<<epsilon<<std::endl;
-	std::cout<<"\t S = "<<S<<std::endl;
+	BOOST_LOG_TRIVIAL(info) << "Random initialization:";
+	BOOST_LOG_TRIVIAL(info) << "\t Nx = "<<Nx;
+	BOOST_LOG_TRIVIAL(info) << "\t Ny = "<<Ny;
+	BOOST_LOG_TRIVIAL(info) << "\t epsilon = "<<epsilon;
+	BOOST_LOG_TRIVIAL(info) << "\t S = "<<S;
 
 	int num=0;
 	for(auto i=state.begin() + 3 * N; i != state.begin() + 4 * N; ++i)
@@ -471,13 +493,13 @@ void gauss_init(std::vector< value_type > &state, const Parameters &params, std:
 	const double x_center = (Nx / 2.0) * epsilon;
 	const double y_center = (Ny / 2.0) * epsilon;
 
-	std::cout<<"Gaussian initialization:"<<std::endl;
-	std::cout<<"\t Nx = "<<Nx<<std::endl;
-	std::cout<<"\t Ny = "<<Ny<<std::endl;
-	std::cout<<"\t x_center = "<<x_center<<std::endl;
-	std::cout<<"\t y_center = "<<y_center<<std::endl;
-	std::cout<<"\t epsilon = "<<epsilon<<std::endl;
-	std::cout<<"\t std = "<<sigma<<std::endl;
+	BOOST_LOG_TRIVIAL(info) << "Gaussian initialization:";
+	BOOST_LOG_TRIVIAL(info) << "\t Nx = "<<Nx;
+	BOOST_LOG_TRIVIAL(info) << "\t Ny = "<<Ny;
+	BOOST_LOG_TRIVIAL(info) << "\t x_center = "<<x_center;
+	BOOST_LOG_TRIVIAL(info) << "\t y_center = "<<y_center;
+	BOOST_LOG_TRIVIAL(info) << "\t epsilon = "<<epsilon;
+	BOOST_LOG_TRIVIAL(info) << "\t std = "<<sigma;
 
 	int num=0;
 	for(
@@ -516,6 +538,7 @@ void gauss_init(std::vector< value_type > &state, const Parameters &params, std:
 */
 void export_neighbors(const rd_dynamics &sys, const Parameters &params)
 {
+	BOOST_LOG_TRIVIAL(info) << "Export neighbors";
 	const size_t &N=sys.get_N();
 
 	// Create file
@@ -664,6 +687,9 @@ int main( int argc , char* argv[] )
 	params.read(argc, argv);
 	std::cout<<params<<std::endl;
 
+	// Initialize the logger
+	generic::init_logger(params.log_level);
+
 	// Create folders in which the results will be stored
 	if(!boost::filesystem::is_directory(params.result_folder))
 	{
@@ -675,6 +701,7 @@ int main( int argc , char* argv[] )
 	}
 
 	// Export parameters used for the current simulation
+	BOOST_LOG_TRIVIAL(info) << "Export parameters";
 	params.write_parameters(params.result_folder + "/parameters_used.prm");
 
 	// Run the simulation
