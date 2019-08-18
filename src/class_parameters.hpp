@@ -6,11 +6,6 @@
 
 #include "program_options.hpp"
 
-static const long double pi=3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117L;
-static const long double piinv=1.L/pi;
-static const long double twopi=2.L*pi;
-static const long double twopi_inv=1.L/twopi;
-
 
 // **********************************************************************
 //		classe contenant tous les paramètres du transport
@@ -67,6 +62,7 @@ public:
 	Parameters()
 	{
 		epsilon=1;
+		S=20. / sqrt(3.0);
 		gauss_std=-1;
 		export_neighbors=false;
 		define_parameters();

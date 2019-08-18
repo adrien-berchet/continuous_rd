@@ -32,6 +32,25 @@ typedef thrust::host_vector< size_t > index_vector_type;
 
 
 /**
+ * \brief Compute X coordinate
+*/
+inline
+double get_x(const size_t &it, const size_t &Nx, const double &epsilon)
+{
+	return (it % Nx) * epsilon;
+}
+
+
+/**
+ * \brief Compute X coordinate
+*/
+inline
+double get_y(const size_t &it, const size_t &Nx, const double &epsilon)
+{
+	return int(it / Nx) * epsilon;
+}
+
+/**
  * \brief Define the dynamic system
 */
 class rd_dynamics
@@ -49,9 +68,13 @@ public:
 			const value_type u = thrust::get<0>(thrust::get<0>(t));
 			const value_type v = thrust::get<1>(thrust::get<0>(t));
 			const value_type w = thrust::get<2>(thrust::get<0>(t));
+			const double epsilon = thrust::get<3>(thrust::get<0>(t));
 
-			// Get P sin(theta)
-			const value_type P_sin_theta = thrust::get<3>(thrust::get<0>(t));
+			// Get P sin(theta) for each direction
+			const value_type P_sin_theta_top = thrust::get<0>(thrust::get<8>(t));
+			const value_type P_sin_theta_bot = thrust::get<1>(thrust::get<8>(t));
+			const value_type P_sin_theta_left = thrust::get<2>(thrust::get<8>(t));
+			const value_type P_sin_theta_right = thrust::get<3>(thrust::get<8>(t));
 
 			// Get neighbors
 			const value_type u_top = thrust::get<0>(thrust::get<1>(t));  // Top neighbor for u
@@ -102,30 +125,44 @@ public:
 			const value_type G = thrust::max(0.0, thrust::min(Gmax, G_cond));
 			const value_type H = thrust::max(0.0, thrust::min(Hmax, H_cond));
 
-			const value_type lapl_u = u_top + u_bot + u_left + u_right - 4 * u;
-			const value_type lapl_v = v_top + v_bot + v_left + v_right - 4 * v;
-			const value_type lapl_w = w_top + w_bot + w_left + w_right - 4 * w;
+			const value_type lapl_u = std::pow(epsilon, -2.0) * (
+				  P_sin_theta_top * (u_top - u)
+				+ P_sin_theta_bot * (u_bot - u)
+				+ P_sin_theta_left * (u_left - u)
+				+ P_sin_theta_right * (u_right - u));
+			const value_type lapl_v = std::pow(epsilon, -2.0) * (
+				  P_sin_theta_top * (v_top - v)
+				+ P_sin_theta_bot * (v_bot - v)
+				+ P_sin_theta_left * (v_left - v)
+				+ P_sin_theta_right * (v_right - v));
+			const value_type lapl_w = std::pow(epsilon, -2.0) * (
+				  P_sin_theta_top * (w_top - w)
+				+ P_sin_theta_bot * (w_bot - w)
+				+ P_sin_theta_left * (w_left - w)
+				+ P_sin_theta_right * (w_right - w));
 
 			// The dynamical equation
-			thrust::get<0>(thrust::get<8>(t)) = F - cu * u + Du * lapl_u * P_sin_theta;
-			thrust::get<1>(thrust::get<8>(t)) = G - cv * v + Dv * lapl_v * P_sin_theta;
-			thrust::get<2>(thrust::get<8>(t)) = H - cw * w + Dw * lapl_w * P_sin_theta;
+			thrust::get<0>(thrust::get<9>(t)) = F - cu * u + Du * lapl_u;
+			thrust::get<1>(thrust::get<9>(t)) = G - cv * v + Dv * lapl_v;
+			thrust::get<2>(thrust::get<9>(t)) = H - cw * w + Dw * lapl_w;
 		}
 	};
 
 	rd_dynamics(
-		const size_t &Nx_in, const size_t &Ny_in,
+		const size_t &Nx_in, const size_t &Ny_in, const double &epsilon_in,
 		const double &cu_in, const double &cv_in, const double &cw_in,
 		const double &c1_in, const double &c2_in, const double &c3_in, const double &c4_in, const double &c5_in, const double &c6_in, const double &c7_in, const double &c8_in, const double &c9_in,
 		const double &Du_in, const double &Dv_in, const double &Dw_in,
-		const double &Fmax_in, const double &Gmax_in, const double &Hmax_in
+		const double &Fmax_in, const double &Gmax_in, const double &Hmax_in,
+		std::vector< double > &Pxx_top_in, std::vector< double > &Pxx_bot_in, std::vector< double > &Pxx_left_in, std::vector< double > &Pxx_right_in
 	):
-		N ( Nx_in * Ny_in ), Nx( Nx_in ), Ny ( Ny_in ),
+		N ( Nx_in * Ny_in ), Nx( Nx_in ), Ny ( Ny_in ), epsilon( epsilon_in ),
 		cu(cu_in), cv(cv_in), cw(cw_in),
 		c1(c1_in), c2(c2_in), c3(c3_in), c4(c4_in), c5(c5_in), c6(c6_in), c7(c7_in), c8(c8_in), c9(c9_in),
 		Du(Du_in), Dv(Dv_in), Dw(Dw_in),
 		Fmax(Fmax_in), Gmax(Gmax_in), Hmax(Hmax_in),
-		top( 3 * N ), bot( 3 * N ), left( 3 * N ), right( 3 * N )
+		top( 3 * N ), bot( 3 * N ), left( 3 * N ), right( 3 * N ),
+		Pxx_top( Pxx_top_in ), Pxx_bot( Pxx_bot_in ), Pxx_left( Pxx_left_in ), Pxx_right( Pxx_right_in )
 	{
 		// Define neighbors
 		thrust::counting_iterator<size_t> counter( 0 );
@@ -174,8 +211,8 @@ public:
 							x.begin() ,
 							x.begin() + N,
 							x.begin() + 2 * N,
-							x.begin() + 3 * N
-					) ),
+							thrust::make_constant_iterator(epsilon)
+					) ) ,
 					thrust::make_zip_iterator(
 						thrust::make_tuple(
 							thrust::make_permutation_iterator( x.begin(), top.begin() ),
@@ -204,6 +241,13 @@ public:
 					thrust::make_constant_iterator( thrust::make_tuple(c1, c2, c3, c4, c5, c6, c7, c8, c9) ),
 					thrust::make_constant_iterator( thrust::make_tuple(Fmax, Gmax, Hmax) ),
 					thrust::make_zip_iterator(
+						thrust::make_tuple(
+							Pxx_top.begin(),
+							Pxx_bot.begin(),
+							Pxx_left.begin(),
+							Pxx_right.begin()
+					) ) ,
+					thrust::make_zip_iterator(
 						thrust::make_tuple(dxdt.begin(), dxdt.begin() + N, dxdt.begin() + 2 * N)
 					)
 			) ),
@@ -214,8 +258,8 @@ public:
 							x.begin() + N,
 							x.begin() + 2 * N,
 							x.begin() + 3 * N,
-							x.end()
-					) ),
+							thrust::make_constant_iterator(epsilon)
+					) ) ,
 					thrust::make_zip_iterator(
 						thrust::make_tuple(
 							thrust::make_permutation_iterator( x.begin(), top.begin() + N ),
@@ -244,6 +288,13 @@ public:
 					thrust::make_constant_iterator( thrust::make_tuple(c1, c2, c3, c4, c5, c6, c7, c8, c9) ),
 					thrust::make_constant_iterator( thrust::make_tuple(Fmax, Gmax, Hmax) ),
 					thrust::make_zip_iterator(
+						thrust::make_tuple(
+							Pxx_top.end(),
+							Pxx_bot.end(),
+							Pxx_left.end(),
+							Pxx_right.end()
+					) ) ,
+					thrust::make_zip_iterator(
 						thrust::make_tuple(dxdt.begin() + N, dxdt.begin() + 2 * N, dxdt.begin() + 3 * N)
 					)
 			) ),
@@ -264,7 +315,11 @@ private:
 	const double c1, c2, c3, c4, c5, c6, c7, c8, c9;
 	const double Du, Dv, Dw;
 	const double Fmax, Gmax, Hmax;
+	const double epsilon;
 	index_vector_type top, bot, left, right;
+
+public:
+	const state_type Pxx_top, Pxx_bot, Pxx_left, Pxx_right;
 };
 
 /**
@@ -296,65 +351,116 @@ size_t number_precision(T &dt)
 */
 struct observer
 {
-    const Parameters &params;
-    const size_t N;
-    const size_t filename_length;
-    const size_t precision;
+	const Parameters &params;
+	const size_t N;
+	const size_t filename_length;
+	const size_t precision;
+	const state_type &Pxx_top, &Pxx_bot, &Pxx_left, &Pxx_right;
 
-    observer( const Parameters &params_in, const size_t &N_in ) : params( params_in ), N( N_in ), filename_length( number_length(params.tmax, params.dt) ), precision( number_precision(params.dt) ) {}
 
-    template< class State >
-    void operator()( const State &state , value_type t )
-    {
-    	// TODO: use params.delta_obs to skip some exports if they are too close from each other
+	observer(
+		const Parameters &params_in, const size_t &N_in,
+		const state_type &Pxx_top_in,
+		const state_type &Pxx_bot_in,
+		const state_type &Pxx_left_in,
+		const state_type &Pxx_right_in
+	):
+		params( params_in ), N( N_in ),
+		filename_length( number_length(params.tmax, params.dt) ),
+		precision( number_precision(params.dt) ),
+		Pxx_top( Pxx_top_in ), Pxx_bot( Pxx_bot_in ), Pxx_left( Pxx_left_in ), Pxx_right( Pxx_right_in )
+	{}
 
-    	// Format file name (zero padding to ensure that the file are always correctly sorted)
+	template< class State >
+	void operator()( const State &state , value_type t )
+	{
+		// TODO: use params.delta_obs to skip some exports if they are too close from each other
+
+		// Format file name (zero padding to ensure that the file are always correctly sorted)
 		std::ostringstream filename;
 		filename << std::fixed << std::setprecision(precision) << std::setw(filename_length) << std::setfill('0') << t;
 
 		// Create file
-        generic::DatWriter data_file(params.result_folder + "/results/" + filename.str() + ".dat");
+		generic::DatWriter data_file(params.result_folder + "/results/" + filename.str() + ".dat");
 
 		// Write header
-        data_file.write_header(std::to_string(t), params.Nx, params.Ny, "x", "y", "u", "v", "w", "P_sin_theta");
+		data_file.write_header(std::to_string(t), params.Nx, params.Ny, "x", "y", "u", "v", "w", "P_sin_theta_top", "P_sin_theta_bot", "P_sin_theta_left", "P_sin_theta_right");
 
-        // Write data
-        // TODO: This is the slowest part of the code, try to improve it either by using binary files or by improving the iterators (but I/O are probably the main limitation)
-        int num=0;
-        for(
-        	auto i=thrust::make_zip_iterator(thrust::make_tuple(
+		// Write data
+		// TODO: This is the slowest part of the code, try to improve it either by using binary files or by improving the iterators (but I/O are probably the main limitation)
+		int num=0;
+		for(
+			auto i=thrust::make_zip_iterator(thrust::make_tuple(
 				state.begin(),
 				state.begin() + N,
 				state.begin() + 2 * N,
-				state.begin() + 3 * N
+				Pxx_top.begin(),
+				Pxx_bot.begin(),
+				Pxx_left.begin(),
+				Pxx_right.begin()
 			) );
 			i != thrust::make_zip_iterator(thrust::make_tuple(
 				state.begin() + N,
 				state.begin() + 2 * N,
 				state.begin() + 3 * N,
-				state.begin() + 4 * N
+				Pxx_top.end(),
+				Pxx_bot.end(),
+				Pxx_left.end(),
+				Pxx_right.end()
 			) );
 			++i
 		)
-        {
-        	const double x = (num % params.Nx) * params.epsilon;
-        	const double y = int(num / params.Nx) * params.epsilon;
-        	data_file.write_row(x, y, thrust::get<0>(*i), thrust::get<1>(*i), thrust::get<2>(*i), thrust::get<3>(*i));
-        	++num;
-        }
-    }
+		{
+			data_file.write_row(
+				get_x(num, params.Nx, params.epsilon),
+				get_y(num, params.Nx, params.epsilon),
+				thrust::get<0>(*i),
+				thrust::get<1>(*i),
+				thrust::get<2>(*i),
+				thrust::get<3>(*i),
+				thrust::get<4>(*i),
+				thrust::get<5>(*i),
+				thrust::get<6>(*i)
+			);
+			++num;
+		}
+	}
 };
 
 /**
  * \brief Random initialization
 */
-void random_init(std::vector< value_type > &state, const Parameters &params)
-{}
+void random_init(std::vector< value_type > &state, const Parameters &params, std::vector< double > &Pxx_top, std::vector< double > &Pxx_bot, std::vector< double > &Pxx_left, std::vector< double > &Pxx_right)
+{
+	const size_t &Nx = params.Nx, &Ny = params.Ny;
+	const size_t N = Nx * Ny;
+
+	const double &epsilon = params.epsilon;
+	const double &S = params.S;
+
+	std::cout<<"Random initialization:"<<std::endl;
+	std::cout<<"\t Nx = "<<Nx<<std::endl;
+	std::cout<<"\t Ny = "<<Ny<<std::endl;
+	std::cout<<"\t epsilon = "<<epsilon<<std::endl;
+	std::cout<<"\t S = "<<S<<std::endl;
+
+	int num=0;
+	for(auto i=state.begin() + 3 * N; i != state.begin() + 4 * N; ++i)
+	{
+		const double x = get_x(num, Nx, epsilon);
+		const double y = get_y(num, Nx, epsilon);
+		// const double r = std::sqrt(std::pow(x - x_center, 2.) + std::pow(y - y_center, 2.));
+		const double P_sin_theta = 0;
+		*i = P_sin_theta;
+		++num;
+	}
+
+}
 
 /**
  * \brief Gaussian initialization. Only used for validation.
 */
-void gauss_init(std::vector< value_type > &state, const Parameters &params)
+void gauss_init(std::vector< value_type > &state, const Parameters &params, std::vector< double > &Pxx_top, std::vector< double > &Pxx_bot, std::vector< double > &Pxx_left, std::vector< double > &Pxx_right)
 {
 	const size_t &Nx = params.Nx, &Ny = params.Ny;
 	const size_t N = Nx * Ny;
@@ -366,14 +472,16 @@ void gauss_init(std::vector< value_type > &state, const Parameters &params)
 	const double y_center = (Ny / 2.0) * epsilon;
 
 	std::cout<<"Gaussian initialization:"<<std::endl;
+	std::cout<<"\t Nx = "<<Nx<<std::endl;
+	std::cout<<"\t Ny = "<<Ny<<std::endl;
 	std::cout<<"\t x_center = "<<x_center<<std::endl;
 	std::cout<<"\t y_center = "<<y_center<<std::endl;
 	std::cout<<"\t epsilon = "<<epsilon<<std::endl;
 	std::cout<<"\t std = "<<sigma<<std::endl;
 
-    int num=0;
-    for(
-    	auto i=thrust::make_zip_iterator(thrust::make_tuple(
+	int num=0;
+	for(
+		auto i=thrust::make_zip_iterator(thrust::make_tuple(
 			state.begin(),
 			state.begin() + N,
 			state.begin() + 2 * N
@@ -385,32 +493,41 @@ void gauss_init(std::vector< value_type > &state, const Parameters &params)
 		) );
 		++i
 	)
-    {
-    	const double x = (num % Nx) * epsilon;
-    	const double y = int(num / Nx) * epsilon;
+	{
+		const double x = get_x(num, Nx, epsilon);
+		const double y = get_y(num, Nx, epsilon);
 		const double r = std::sqrt(std::pow(x - x_center, 2.) + std::pow(y - y_center, 2.));
 		const double C = std::exp(-std::pow(r, 2.) / (2. * std::pow(sigma, 2.)));
-    	thrust::get<0>(*i) = C;
-    	thrust::get<1>(*i) = C;
-    	thrust::get<2>(*i) = C;
-    	++num;
-    }
+		thrust::get<0>(*i) = C;
+		thrust::get<1>(*i) = C;
+		thrust::get<2>(*i) = C;
+		++num;
+	}
+
+	// Set P sin(theta) = 1 everywhere for all direction
+	std::fill(Pxx_top.begin(), Pxx_top.end(), 1.0);
+	std::fill(Pxx_bot.begin(), Pxx_bot.end(), 1.0);
+	std::fill(Pxx_left.begin(), Pxx_left.end(), 1.0);
+	std::fill(Pxx_right.begin(), Pxx_right.end(), 1.0);
 }
 
+/**
+ * \brief Export neighbors indices used to compute the laplacian. Only used for validation.
+*/
 void export_neighbors(const rd_dynamics &sys, const Parameters &params)
 {
 	const size_t &N=sys.get_N();
 
 	// Create file
-    generic::DatWriter data_file(params.result_folder + "/neighbors.dat");
+	generic::DatWriter data_file(params.result_folder + "/neighbors.dat");
 
 	// Write header
-    data_file.write_header("Neighbors", params.Nx, params.Ny, "x", "y", "num", "top_u", "top_v", "top_w", "bot_u", "bot_v", "bot_w", "left_u", "left_v", "left_w", "right_u", "right_v", "right_w");
+	data_file.write_header("Neighbors", params.Nx, params.Ny, "x", "y", "num", "top_u", "top_v", "top_w", "bot_u", "bot_v", "bot_w", "left_u", "left_v", "left_w", "right_u", "right_v", "right_w");
 
-    // Write data
-    int num=0;
-    for(
-    	auto i=thrust::make_zip_iterator(
+	// Write data
+	int num=0;
+	for(
+		auto i=thrust::make_zip_iterator(
 			thrust::make_tuple(
 				thrust::make_zip_iterator(
 					thrust::make_tuple(
@@ -466,18 +583,18 @@ void export_neighbors(const rd_dynamics &sys, const Parameters &params)
 		) );
 		++i
 	)
-    {
-    	const double x = (num % params.Nx) * params.epsilon;
-    	const double y = int(num / params.Nx) * params.epsilon;
-    	data_file.write_row(
-    		x, y, num,
-    		thrust::get<0>(thrust::get<0>(*i)), thrust::get<1>(thrust::get<0>(*i)), thrust::get<2>(thrust::get<0>(*i)),
-    		thrust::get<0>(thrust::get<1>(*i)), thrust::get<1>(thrust::get<1>(*i)), thrust::get<2>(thrust::get<1>(*i)),
-    		thrust::get<0>(thrust::get<2>(*i)), thrust::get<1>(thrust::get<2>(*i)), thrust::get<2>(thrust::get<2>(*i)),
-    		thrust::get<0>(thrust::get<3>(*i)), thrust::get<1>(thrust::get<3>(*i)), thrust::get<2>(thrust::get<3>(*i))
+	{
+		const double x = get_x(num, params.Nx, params.epsilon);
+		const double y = get_y(num, params.Nx, params.epsilon);
+		data_file.write_row(
+			x, y, num,
+			thrust::get<0>(thrust::get<0>(*i)), thrust::get<1>(thrust::get<0>(*i)), thrust::get<2>(thrust::get<0>(*i)),
+			thrust::get<0>(thrust::get<1>(*i)), thrust::get<1>(thrust::get<1>(*i)), thrust::get<2>(thrust::get<1>(*i)),
+			thrust::get<0>(thrust::get<2>(*i)), thrust::get<1>(thrust::get<2>(*i)), thrust::get<2>(thrust::get<2>(*i)),
+			thrust::get<0>(thrust::get<3>(*i)), thrust::get<1>(thrust::get<3>(*i)), thrust::get<2>(thrust::get<3>(*i))
 		);
-    	++num;
-    }
+		++num;
+	}
 }
 
 std::vector<value_type> simulate_rd(Parameters &params)
@@ -490,19 +607,20 @@ std::vector<value_type> simulate_rd(Parameters &params)
 
 	const size_t &Nx = params.Nx, &Ny = params.Ny;
 	const size_t N = Nx * Ny;
+	const double &epsilon = params.epsilon;
 	const value_type &dt = params.dt;
 
 	// Create vectors of data: all variables are concatenated into one vector for simplicity
 	// Create initial conditions and initial values on host
-	std::vector< value_type > x_host( 4 * N, 0 );
-    std::fill(x_host.begin() + 3 * N, x_host.end(), 1.0); // Set P sin(theta) = 1 everywhere
+	std::vector< value_type > x_host( 3 * N, 0 );
+	std::vector< double > Pxx_top( N, 1.0 ), Pxx_bot( N, 1.0 ), Pxx_left( N, 1.0 ), Pxx_right( N, 1.0 );
 	if (params.gauss_std > 0)
 	{
-		gauss_init(x_host, params);
+		gauss_init(x_host, params, Pxx_top, Pxx_bot, Pxx_left, Pxx_right);
 	}
 	else
 	{
-		random_init(x_host, params);
+		random_init(x_host, params, Pxx_top, Pxx_bot, Pxx_left, Pxx_right);
 	}
 
 	// Copy to device
@@ -513,11 +631,12 @@ std::vector<value_type> simulate_rd(Parameters &params)
 
 	// Create phase oscillator system function
 	rd_dynamics sys(
-		Nx, Ny,
+		Nx, Ny, epsilon,
 		cu, cv, cw,
 		c1, c2, c3, c4, c5, c6, c7, c8, c9,
 		Du, Dv, Dw,
-		Fmax, Gmax, Hmax
+		Fmax, Gmax, Hmax,
+		Pxx_top, Pxx_bot, Pxx_left, Pxx_right
 	);
 
 	// Export neighbors
@@ -527,7 +646,7 @@ std::vector<value_type> simulate_rd(Parameters &params)
 	}
 
 	// Create observer
-	observer obs(params, N);
+	observer obs(params, N, sys.Pxx_top, sys.Pxx_bot, sys.Pxx_left, sys.Pxx_right);
 
 	// Integrate
 	// TODO: Add stoping criteria but Boost::ODEINT does not provide an easy way to do this. I think this should be done inside the observer to interrupt the integration when the criteria is satisfied. Another solution can be to just use do_step() manually.
