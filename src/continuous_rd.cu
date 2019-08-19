@@ -1,9 +1,11 @@
 #define BOOST_LOG_DYN_LINK 1
 
+#include <algorithm>
 #include <cmath>
-#include <iostream>
-#include <sstream>
 #include <iomanip>
+#include <iostream>
+#include <random>
+#include <sstream>
 
 #include <thrust/device_vector.h>
 #include <thrust/iterator/permutation_iterator.h>
@@ -18,21 +20,24 @@
 #include "logger.hpp"
 
 #include "class_parameters.hpp"
+#include "hex_2d_lattice.hpp"
 
 namespace ode = boost::numeric::odeint;
+
+const std::tuple<double, double, double> black(6.85, 0.09, 4.75);
+const std::tuple<double, double, double> green(0.05, 5.35, 0.09);
 
 
 // Change this to float if your device does not support double computation
 typedef double value_type;
 
 
-#ifdef WITH_GPU
+typedef thrust::host_vector< value_type > host_state_type;
+typedef thrust::host_vector< int > host_int_vector_type;
+typedef thrust::host_vector< size_t > host_index_vector_type;
+
 typedef thrust::device_vector< value_type > state_type;
 typedef thrust::device_vector< size_t > index_vector_type;
-#else
-typedef thrust::host_vector< value_type > state_type;
-typedef thrust::host_vector< size_t > index_vector_type;
-#endif
 
 
 /**
@@ -129,17 +134,17 @@ public:
 			const value_type G = thrust::max(0.0, thrust::min(Gmax, G_cond));
 			const value_type H = thrust::max(0.0, thrust::min(Hmax, H_cond));
 
-			const value_type lapl_u = std::pow(epsilon, -2.0) * (
+			const value_type lapl_u = (
 				  P_sin_theta_top * (u_top - u)
 				+ P_sin_theta_bot * (u_bot - u)
 				+ P_sin_theta_left * (u_left - u)
 				+ P_sin_theta_right * (u_right - u));
-			const value_type lapl_v = std::pow(epsilon, -2.0) * (
+			const value_type lapl_v = (
 				  P_sin_theta_top * (v_top - v)
 				+ P_sin_theta_bot * (v_bot - v)
 				+ P_sin_theta_left * (v_left - v)
 				+ P_sin_theta_right * (v_right - v));
-			const value_type lapl_w = std::pow(epsilon, -2.0) * (
+			const value_type lapl_w = (
 				  P_sin_theta_top * (w_top - w)
 				+ P_sin_theta_bot * (w_bot - w)
 				+ P_sin_theta_left * (w_left - w)
@@ -158,7 +163,7 @@ public:
 		const double &c1_in, const double &c2_in, const double &c3_in, const double &c4_in, const double &c5_in, const double &c6_in, const double &c7_in, const double &c8_in, const double &c9_in,
 		const double &Du_in, const double &Dv_in, const double &Dw_in,
 		const double &Fmax_in, const double &Gmax_in, const double &Hmax_in,
-		std::vector< double > &Pxx_top_in, std::vector< double > &Pxx_bot_in, std::vector< double > &Pxx_left_in, std::vector< double > &Pxx_right_in
+		host_state_type &Pxx_top_in, host_state_type &Pxx_bot_in, host_state_type &Pxx_left_in, host_state_type &Pxx_right_in
 	):
 		N ( Nx_in * Ny_in ), Nx( Nx_in ), Ny ( Ny_in ), epsilon( epsilon_in ),
 		cu(cu_in), cv(cv_in), cw(cw_in),
@@ -452,37 +457,149 @@ struct observer
 /**
  * \brief Random initialization
 */
-void random_init(std::vector< value_type > &state, const Parameters &params, std::vector< double > &Pxx_top, std::vector< double > &Pxx_bot, std::vector< double > &Pxx_left, std::vector< double > &Pxx_right)
+void random_hex_init(host_state_type &state, const Parameters &params, host_state_type &Pxx_top, host_state_type &Pxx_bot, host_state_type &Pxx_left, host_state_type &Pxx_right)
 {
 	const size_t &Nx = params.Nx, &Ny = params.Ny;
 	const size_t N = Nx * Ny;
 
 	const double &epsilon = params.epsilon;
 	const double &S = params.S;
+	const double &P = params.P;
 
 	BOOST_LOG_TRIVIAL(info) << "Random initialization:";
 	BOOST_LOG_TRIVIAL(info) << "\t Nx = "<<Nx;
 	BOOST_LOG_TRIVIAL(info) << "\t Ny = "<<Ny;
 	BOOST_LOG_TRIVIAL(info) << "\t epsilon = "<<epsilon;
 	BOOST_LOG_TRIVIAL(info) << "\t S = "<<S;
+	BOOST_LOG_TRIVIAL(info) << "\t P = "<<P;
 
+
+	// Generate hexagonal lattice
+	const double hex_width(2. * S), hex_hor_space(hex_width * 3. / 4.), hex_vert_space(S * sqrt(3.));
+	const size_t Nq(std::max(size_t(1), size_t((Nx * epsilon) / hex_hor_space)));
+	const size_t Nr(std::max(size_t(1), size_t((Ny * epsilon) / hex_vert_space)));
+
+	generic::Hex2dLattice hex(S, Nq, Nr);
+
+	BOOST_LOG_TRIVIAL(debug) << "\t Hexagonal lattice generation";
+	BOOST_LOG_TRIVIAL(debug) << "\t\t hex.side="<<hex.side;
+	BOOST_LOG_TRIVIAL(debug) << "\t\t hex.x_length="<<hex.x_length;
+	BOOST_LOG_TRIVIAL(debug) << "\t\t hex.y_length="<<hex.y_length;
+	BOOST_LOG_TRIVIAL(debug) << "\t\t hex.hex_width="<<hex.hex_width;
+	BOOST_LOG_TRIVIAL(debug) << "\t\t hex.hex_hor_space="<<hex.hex_hor_space;
+	BOOST_LOG_TRIVIAL(debug) << "\t\t hex.hex_vert_space="<<hex.hex_vert_space;
+	BOOST_LOG_TRIVIAL(debug) << "\t\t hex.Nq="<<hex.Nq;
+	BOOST_LOG_TRIVIAL(debug) << "\t\t hex.Nr="<<hex.Nr;
+
+	host_int_vector_type hex_colors(hex.N, 0);
+
+    // Generate random colors
+	std::random_device rd;
+    std::mt19937 random_engine(rd());
+    std::uniform_int_distribution<> distribution(0, 1);
+	std::generate(hex_colors.begin(), hex_colors.end(), [&distribution, &random_engine]() { return distribution(random_engine); });
+
+	BOOST_LOG_TRIVIAL(debug) << "\t Generate component values and Laplacian correction terms";
+
+	// Initialize P * sin(theta) terms
+	// Set P sin(theta) = epsilon^{-2} everywhere for all direction
+	std::fill(Pxx_top.begin(), Pxx_top.end(), std::pow(epsilon, -2.0));
+	std::fill(Pxx_bot.begin(), Pxx_bot.end(), std::pow(epsilon, -2.0));
+	std::fill(Pxx_left.begin(), Pxx_left.end(), std::pow(epsilon, -2.0));
+	std::fill(Pxx_right.begin(), Pxx_right.end(), std::pow(epsilon, -2.0));
+
+    std::uniform_real_distribution<> perturbation(-0.1, 0.1);
 	int num=0;
-	for(auto i=state.begin() + 3 * N; i != state.begin() + 4 * N; ++i)
+	for(
+		auto i=thrust::make_zip_iterator(thrust::make_tuple(
+			state.begin(),
+			state.begin() + N,
+			state.begin() + 2 * N,
+			Pxx_top.begin(),
+			Pxx_bot.begin(),
+			Pxx_left.begin(),
+			Pxx_right.begin()
+		) );
+		i != thrust::make_zip_iterator(thrust::make_tuple(
+			state.begin() + N,
+			state.begin() + 2 * N,
+			state.begin() + 3 * N,
+			Pxx_top.end(),
+			Pxx_bot.end(),
+			Pxx_left.end(),
+			Pxx_right.end()
+		) );
+		++i
+	)
 	{
+		// Compute coordinates of the current element
 		const double x = get_x(num, Nx, epsilon);
 		const double y = get_y(num, Nx, epsilon);
-		// const double r = std::sqrt(std::pow(x - x_center, 2.) + std::pow(y - y_center, 2.));
-		const double P_sin_theta = 0;
-		*i = P_sin_theta;
+
+		// Find to which hexagon it belongs
+		size_t hex_ind = hex.hex_coords_to_ind(hex.eucl_to_hex_coords(x, y));
+
+		// Find the coordinates and color of this hexagon
+		const int &color_hex = hex_colors[hex_ind];
+
+		// Compute values of u, v, w
+		const double u_init = (color_hex == 0 ? std::get<0>(black) : std::get<0>(green)) + perturbation(random_engine);
+		const double v_init = (color_hex == 0 ? std::get<1>(black) : std::get<1>(green)) + perturbation(random_engine);
+		const double w_init = (color_hex == 0 ? std::get<2>(black) : std::get<2>(green)) + perturbation(random_engine);
+
+		// Set values to u, v, w
+		thrust::get<0>(*i) = u_init;
+		thrust::get<1>(*i) = v_init;
+		thrust::get<2>(*i) = w_init;
+
+		// Compute the Laplacian correction terms
+		const std::vector<double> top_segment{x, y, x, y + epsilon};
+		const std::vector<double> bot_segment{x, y, x, y - epsilon};
+		const std::vector<double> left_segment{x, y, x - epsilon, y};
+		const std::vector<double> right_segment{x, y, x + epsilon, y};
+
+		auto hex_segments = hex.hex_segments(hex_ind);
+
+		for (auto&& segment : hex_segments)
+		{
+			const double angle_top = hex.intersection_sin_angle(segment, top_segment);
+			if(angle_top != -10.)
+			{
+				thrust::get<3>(*i) *= P * angle_top;
+			}
+
+			const double angle_bot = hex.intersection_sin_angle(segment, bot_segment);
+			if(angle_bot != -10.)
+			{
+				thrust::get<4>(*i) *= P * angle_bot;
+			}
+
+			const double angle_left = hex.intersection_sin_angle(segment, left_segment);
+			if(angle_left != -10.)
+			{
+				thrust::get<5>(*i) *= P * angle_left;
+			}
+
+			const double angle_right = hex.intersection_sin_angle(segment, right_segment);
+			if(angle_right != -10.)
+			{
+				thrust::get<6>(*i) *= P * angle_right;
+			}
+		}
 		++num;
 	}
 
+	// Export hexagonal lattice
+	if(params.export_hex_lattice)
+	{
+		generic::export_hex_lattice(hex, hex_colors, params.result_folder);
+	}
 }
 
 /**
  * \brief Gaussian initialization. Only used for validation.
 */
-void gauss_init(std::vector< value_type > &state, const Parameters &params, std::vector< double > &Pxx_top, std::vector< double > &Pxx_bot, std::vector< double > &Pxx_left, std::vector< double > &Pxx_right)
+void gauss_init(host_state_type &state, const Parameters &params, host_state_type &Pxx_top, host_state_type &Pxx_bot, host_state_type &Pxx_left, host_state_type &Pxx_right)
 {
 	const size_t &Nx = params.Nx, &Ny = params.Ny;
 	const size_t N = Nx * Ny;
@@ -620,7 +737,7 @@ void export_neighbors(const rd_dynamics &sys, const Parameters &params)
 	}
 }
 
-std::vector<value_type> simulate_rd(Parameters &params)
+host_state_type simulate_rd(Parameters &params)
 {
 	// Get values from parameters
 	const double &cu=params.cu, &cv=params.cv, &cw=params.cw;
@@ -635,15 +752,15 @@ std::vector<value_type> simulate_rd(Parameters &params)
 
 	// Create vectors of data: all variables are concatenated into one vector for simplicity
 	// Create initial conditions and initial values on host
-	std::vector< value_type > x_host( 3 * N, 0 );
-	std::vector< double > Pxx_top( N, 1.0 ), Pxx_bot( N, 1.0 ), Pxx_left( N, 1.0 ), Pxx_right( N, 1.0 );
+	host_state_type x_host( 3 * N, 0 );
+	host_state_type Pxx_top( N, 1.0 ), Pxx_bot( N, 1.0 ), Pxx_left( N, 1.0 ), Pxx_right( N, 1.0 );
 	if (params.gauss_std > 0)
 	{
 		gauss_init(x_host, params, Pxx_top, Pxx_bot, Pxx_left, Pxx_right);
 	}
 	else
 	{
-		random_init(x_host, params, Pxx_top, Pxx_bot, Pxx_left, Pxx_right);
+		random_hex_init(x_host, params, Pxx_top, Pxx_bot, Pxx_left, Pxx_right);
 	}
 
 	// Copy to device
@@ -705,5 +822,5 @@ int main( int argc , char* argv[] )
 	params.write_parameters(params.result_folder + "/parameters_used.prm");
 
 	// Run the simulation
-	std::vector<value_type> result = simulate_rd(params);
+	host_state_type result = simulate_rd(params);
 }

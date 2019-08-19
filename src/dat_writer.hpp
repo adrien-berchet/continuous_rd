@@ -14,8 +14,7 @@ namespace generic
 
     /**
      * \ingroup generic
-     * \brief This is a class that provides methods to
-     * write DAT files.
+     * \brief This is a class that provides methods to write DAT files.
     */
     class DatWriter
     {
