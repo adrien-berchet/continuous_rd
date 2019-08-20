@@ -63,7 +63,7 @@ The continuous reaction-diffusion model is represented by the following system o
 In equation \ref{rd_eq}, $u$ and $v$ components represent the densities of melanophores and xanthophores, respectively. The $w$ component represents a long-range factor (diffusion coefficient $D_w$ much larger than $D_u$ and $D_v$ ) produced by melanophores only.
 In equation \ref{rd_eq_interactions}, $F$, $G$ and $H$ represents interactions among the chromatophores.
 
-This model is implemented on a $2000 \times 380$ square lattice with step $\epsilon$ using periodic boundary conditions. In order to model the difference of skin thickness inside the skin scales versus their borders, regular hexagonal pattern (with hexagon side length $S$) is superimposed on the regular grid and the diffusion coefficients is reduced at the boundaries of hexagons: the Laplacian is multiplied by a factor $P_{xx'} = P \sin (\theta)$ at edges intersecting an hexagon boundary with angle $\theta$ and $P_{xx'} = 1$ at other edges.
+This model is implemented on a $2000 \times 380$ square lattice with step $\epsilon$ using periodic boundary conditions. In order to model the difference of skin thickness inside the skin scales versus their borders, regular hexagonal pattern (with hexagon side length $S$) is superimposed on the regular grid and the diffusion coefficients is reduced at the boundaries of hexagons: the Laplacian is multiplied by a factor $P(xx') = P \sin (\theta)$ at edges intersecting an hexagon boundary with angle $\theta$ and $P(xx') = 1$ at other edges.
 
 \section{Code implementation details}
 \label{sec:implementation}
@@ -87,7 +87,7 @@ where $x_k$ is the measured value and $x'_k$ is the expected value.
 \label{ssec:diffusion}
 
 The right-hand side of each component contains a diffusion term which is the most complicated to model and for which the analytical solution is known. It is thus possible to validate this term by setting all other terms to zero and by comparing the dynamics to the analytical solution. In this model, a simple diffusion process is obtained if the following constants are set to zero: $c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_u, c_v$ and $c_w$.
-Also, the term $P_{xx'} = P \sin (\theta)$ is ignored in this validation process.
+Also, the term $P(xx') = P \sin (\theta)$ is ignored in this validation process.
 
 In these conditions, each component should follow the equation \ref{eq:diffusion}. For this validation process, the diffusion coefficients are set to the values that will be used in the later work.
 \begin{align}
@@ -147,7 +147,7 @@ The figure \ref{fig:err2-decay} presents the $L_2$ error of this decay process a
 
 Only one complete simulation could be run (with 120000 time steps) because it takes around 1h45 on the laptop used for these tests (running on a NVIDIA GeForce GTX 1080 Ti).
 
-The figure \ref{fig:init_state_u} shows the initial state of the component $u$after a random initialization. The other components are similar. The figure \ref{fig:init_state_Pxx_u} shows the top component of the term $P_{xx'}$ and shows an issue with its initialization. This bug could not be fixed in the given time. This bug make holes in the scale boundaries, so the diffusion process can go through these boundaries, as shown in figure \ref{fig:init_state_u_13s}. Because of that,so the components tend to homogeneize along the entire system.
+The figure \ref{fig:init_state_u} shows the initial state of the component $u$after a random initialization. The other components are similar. The figure \ref{fig:init_state_Pxx_u} shows the top component of the term $P(xx')$ and shows an issue with its initialization (the same kind of issue is observed for the other components of $P(xx')$. This bug could not be fixed in the given time. This bug make holes in the scale boundaries, so the diffusion process can go through these boundaries, as shown in figure \ref{fig:init_state_u_13s}. Because of that, the components tend to homogeneize along the entire system.
 
 \begin{figure}
 \label{fig:init_state_u}
@@ -164,7 +164,7 @@ The figure \ref{fig:init_state_u} shows the initial state of the component $u$af
 \begin{figure}
 \label{fig:init_state_u_13s}
 	\includegraphics[width=\textwidth]{../results/skin_dynamics/13s_zoom.png}
-	\caption{The $u$ component after $850$ iterations. One can see that the diffusion process go through the boundaries.}
+	\caption{The $u$ component after $850$ iterations. One can see that the diffusion process go through the boundaries. The same phenomenon is observed on the components $v$ and $w$.}
 \end{figure}
 
 \section{Perspectives}
@@ -172,7 +172,7 @@ The figure \ref{fig:init_state_u} shows the initial state of the component $u$af
 
 The current methods and codes could be improved in several ways. The main ones foreseen are the following:
 \begin{itemize}
-	\item The main issue is that the initialization is currently broken: some of the $P \times sin(\theta)$ terms do not get proper values. Because of that, the diffusion process do not behaves as intended and all the components tend to homogeneize accrose the hexagonal scales.
+	\item The main issue is that the initialization of the $P(xx')$ terms is currently broken: some of the $P \times sin(\theta)$ terms do not get proper values. Because of that, the diffusion process do not behaves as intended and all the components tend to homogeneize across the hexagonal scales.
 	\item The ASCII file format is not efficient and the result export is very slow (exporting one state take as much time as around 800 computation steps using a Runge-Kutta4 stepper). A strong improvement of this process could consist in using binary file format and write asynchronously.
 	\item The current code only export the components $(u, v, w)$ but do not compute actual scale colors. A post-processing Python script should be written to do that.
 	\item The initialization should be able to get a map input based on real lizard skin. In this work, the lattice is initialized randomly.
