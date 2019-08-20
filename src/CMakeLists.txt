@@ -1,25 +1,10 @@
 # Generate the executable
-# CUDA_ADD_EXECUTABLE(
-#     continuous_rd.exe
-#     continuous_rd.cpp
-#     continuous_rd_device.cu
-# )
 ADD_EXECUTABLE(
     continuous_rd.exe
     continuous_rd.cu
-    # continuous_rd.cpp
-    # continuous_rd_device.cu
 )
 
 SET_PROPERTY(TARGET continuous_rd.exe PROPERTY CUDA_STANDARD 14)
-
-IF( GPU )
-  TARGET_COMPILE_DEFINITIONS(continuous_rd.exe PRIVATE -DWITH_GPU)
-ENDIF( GPU )
-
-IF( PROFILING )
-    TARGET_COMPILE_DEFINITIONS(continuous_rd.exe PRIVATE -DPROFILING)
-ENDIF( PROFILING )
 
 TARGET_LINK_LIBRARIES(continuous_rd.exe
                       m

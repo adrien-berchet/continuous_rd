@@ -70,6 +70,13 @@ host_state_type simulate_rd(Parameters &params)
 	// TODO: Add stoping criteria but Boost::ODEINT does not provide an easy way to do this. I think this should be done inside the observer to interrupt the integration when the criteria is satisfied. Another solution can be to just use do_step() manually.
 	integrate_const( stepper , sys , x , 0.0 , params.tmax , dt , boost::ref(obs));
 
+	// Export final state
+	if (obs.last_t != params.tmax)
+	{
+		obs.last_t = -1;
+		obs(x, params.tmax);
+	}
+
 	// Export results
 	thrust::copy( x.begin() , x.end() , x_host.begin() );
 	return x_host;

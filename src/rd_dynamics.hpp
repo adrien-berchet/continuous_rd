@@ -375,7 +375,7 @@ struct observer
 		Pxx_top( Pxx_top_in ), Pxx_bot( Pxx_bot_in ), Pxx_left( Pxx_left_in ), Pxx_right( Pxx_right_in )
 	{
 		BOOST_LOG_TRIVIAL(debug) << "Observer initialization";
-		last_t = -1;
+		last_t = - 1.01 * params_in.delta_obs;
 	}
 
 	/**
@@ -384,46 +384,56 @@ struct observer
 	template< class State >
 	void operator()( const State &state , value_type t )
 	{
-		// TODO: use params.delta_obs to skip some exports if they are too close from each other
-		if(t - last_t < params.delta_obs || t >= params.tmax - params.dt)
+		// Skip some exports if they are too close from each other
+		if(t - last_t < params.delta_obs)
 		{
 			BOOST_LOG_TRIVIAL(debug) << "Skip export results for t="<<t;
 			return;
 		}
 		else
 		{
-			last_t = t;
+			if (last_t < 0)
+			{
+				last_t = t;
+			}
+			else
+			{
+				last_t += params.delta_obs;
+			}
 		}
 
 		// Format file name (zero padding to ensure that the file are always correctly sorted)
 		std::ostringstream filename;
-		filename << std::fixed << std::setprecision(precision) << std::setw(filename_length) << std::setfill('0') << t << ".dat";
+		filename << std::fixed << std::setprecision(precision) << std::setw(filename_length) << std::setfill('0') << params.result_folder << "/results/" << t << ".dat";
 
 		BOOST_LOG_TRIVIAL(info) << "Export results for t="<<t<<" in "<<filename.str();
 
 		// Create file
-		generic::DatWriter data_file(params.result_folder + "/results/" + filename.str());
+		generic::DatWriter data_file(filename.str());
 
 		// Write header
 		data_file.write_header(std::to_string(t), params.Nx, params.Ny, "x", "y", "u", "v", "w", "P_sin_theta_top", "P_sin_theta_bot", "P_sin_theta_left", "P_sin_theta_right");
+
+		// Transfert data to host
+		host_state_type tmp = state;
 
 		// Write data
 		// TODO: This is the slowest part of the code, try to improve it either by using binary files or by improving the iterators (but I/O are probably the main limitation)
 		int num=0;
 		for(
 			auto i=thrust::make_zip_iterator(thrust::make_tuple(
-				state.begin(),
-				state.begin() + N,
-				state.begin() + 2 * N,
+				tmp.begin(),
+				tmp.begin() + N,
+				tmp.begin() + 2 * N,
 				Pxx_top.begin(),
 				Pxx_bot.begin(),
 				Pxx_left.begin(),
 				Pxx_right.begin()
 			) );
 			i != thrust::make_zip_iterator(thrust::make_tuple(
-				state.begin() + N,
-				state.begin() + 2 * N,
-				state.begin() + 3 * N,
+				tmp.begin() + N,
+				tmp.begin() + 2 * N,
+				tmp.begin() + 3 * N,
 				Pxx_top.end(),
 				Pxx_bot.end(),
 				Pxx_left.end(),

@@ -19,11 +19,8 @@ IF(POLICY CMP0042)
     CMAKE_POLICY(SET CMP0042 NEW) # MACOSX_RPATH
 ENDIF()
 
-OPTION(THREAD       "Build binaries with multi-threading enabled" ON)
-OPTION(GPU          "Build binaries with GPU enabled" ON)
-OPTION(DOC          "Setup the doxygen documentation (must run \"make doc\" afterwards to actually build the doc)" OFF)
+OPTION(DOC          "Setup the doxygen documentation (must run \"make doc\" afterwards to actually build the doc)" ON)
 OPTION(TESTS        "Setup the test suite" OFF)
-OPTION(PROFILING    "Enable profiling" OFF)
 
 # Get the last tag committed
 # Another command can get the current branch: git rev-parse --abbrev-ref HEAD
@@ -33,10 +30,6 @@ OPTION(PROFILING    "Enable profiling" OFF)
 #     OUTPUT_VARIABLE GIT_BRANCH
 #     OUTPUT_STRIP_TRAILING_WHITESPACE
 # )
-
-# IF(THREAD)
-#     ADD_DEFINITIONS(-DTHREAD)
-# ENDIF(THREAD)
 
 FIND_PACKAGE(Boost 1.65.0 REQUIRED)
 INCLUDE_DIRECTORIES(SYSTEM ${Boost_INCLUDE_DIRS})
