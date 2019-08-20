@@ -67,7 +67,7 @@ host_state_type simulate_rd(Parameters &params)
 	observer obs(params, N, sys.Pxx_top, sys.Pxx_bot, sys.Pxx_left, sys.Pxx_right);
 
 	// Integrate
-	// TODO: Add stoping criteria but Boost::ODEINT does not provide an easy way to do this. I think this should be done inside the observer to interrupt the integration when the criteria is satisfied. Another solution can be to just use do_step() manually.
+	// TODO: Add stopping criteria but Boost::ODEINT does not provide an easy way to do this. I think this should be done inside the observer to interrupt the integration when the criteria is satisfied. Another solution can be to just use do_step() manually.
 	integrate_const( stepper , sys , x , 0.0 , params.tmax , dt , boost::ref(obs));
 
 	// Export final state

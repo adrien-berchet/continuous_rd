@@ -28,7 +28,10 @@
 
 The skin of oscellated lizards presents labyrinthine pattern that look close to the ones obtained by a quasi-hexagonal probabilistic cellular automaton. This goal of this work is to model the skin color dynamics during the lizards' life using a reaction-diffusion model \citep{Manukyan2017}. The skin of oscellated lizards contains 3 kinds of pigmentary elements: melanophores, xanthophores and iridophores, but the reaction-diffusion model is only applied to melanophores and xanthophores because the contribution of iridophores is neglictible in the process \citep{Nakamasu8429}.
 
+The work presented in this document consists in modeling the skin dynamics using a continuous reaction-diffusion equation. This model is introduced in section \ref{sec:continuous_rd} and some implementation details are given in section \ref{sec:implementation}. Afterwards, the validation process and results are presented in sections \ref{sec:validation} and \ref{sec:results}.
+
 \section{The continuous reaction-diffusion model}
+\label{sec:continuous_rd}
 
 The continuous reaction-diffusion model is represented by the following system of nonlinear partial differential equations \citep{Nakamasu8429}:
 
@@ -60,19 +63,17 @@ The continuous reaction-diffusion model is represented by the following system o
 In equation \ref{rd_eq}, $u$ and $v$ components represent the densities of melanophores and xanthophores, respectively. The $w$ component represents a long-range factor (diffusion coefficient $D_w$ much larger than $D_u$ and $D_v$ ) produced by melanophores only.
 In equation \ref{rd_eq_interactions}, $F$, $G$ and $H$ represents interactions among the chromatophores.
 
-This model is implemented on a $2000 \times 380$ square lattice with step $\epsilon$ using periodic boundary conditions. In order to model the difference of skin thickness inside the skin scales versus their borders, regular hexagonal pattern (with hexagon side length $S$) is superimposed on the regular grid and the diffusion coefficients is reduced at the boundaries of hexagons: the Laplacian is multiplied by a factor $P \sin (\theta)$ at edges intersecting an hexagon boundary with angle $\theta$.
+This model is implemented on a $2000 \times 380$ square lattice with step $\epsilon$ using periodic boundary conditions. In order to model the difference of skin thickness inside the skin scales versus their borders, regular hexagonal pattern (with hexagon side length $S$) is superimposed on the regular grid and the diffusion coefficients is reduced at the boundaries of hexagons: the Laplacian is multiplied by a factor $P_{xx'} = P \sin (\theta)$ at edges intersecting an hexagon boundary with angle $\theta$ and $P_{xx'} = 1$ at other edges.
 
 \section{Code implementation details}
+\label{sec:implementation}
 
 The code implementation was guided by the short delay and by the computation time. The delay did not allow to test several libraries so a low level approach was chosen. This choice seems reasonable since only low order laplacian calculation is targeted, so the neighborhoods are quite easy to implement. Furthermore, because of the quite large number of numerical elements, parallele computation is required in order to obtain the results in a decent time. The library Boost::ODEINT, which aims to solve ordinary differential equations, can be coupled with the Thrust library witch is meant to use the GPU for calculation. The Boost::ODEINT library was chosen for its simplicity and its simplicity and because it is very convenient to switch from a numerical scheme to another. In this work, the Runge-Kutta 4 scheme is used. Also, this library has simple mechanisms to monitor temporary results. The main drawback of this library is that it does not provide simple way to implement stopping criteria, so a manual implementation would be needed. This last point is not yet implemented in this work due to the short delay.
-
-Hexagonal lattice generation
-Data storing
-Post-process scripts in Python
 
 For the sake of simplicity, the results are stored in ASCII files (see format details in 4.3 of \cite{tecplot_dataformat_guide}) at given time steps. Then these files are post-processed using Python scripts in order to compare them to analytical solutions, to display the dynamics of a given set of elements or to transform the results in images.
 
 \section{Validation}
+\label{sec:validation}
 
 The right-hand side of each component contains 3 terms: an interaction term, a decay term and a diffusion term. The interaction term acts like a source or a sink, depending on the other component values. This first term calculation is trivial and behaves like a dynamic decay term (though it might also increase instead of only decrease), so it is not specifically validated in this report. The two other decay and diffusion terms are validated by comparing their results to analytical values for simple setups that are presented in the following subsections. For each validation process, the results are compared to analytical solutions using a L2-norm error (or least squares error) which is defined by equation \ref{eq:l2-error}.
 
@@ -83,9 +84,10 @@ The right-hand side of each component contains 3 terms: an interaction term, a d
 where $x_k$ is the measured value and $x'_k$ is the expected value.
 
 \subsection{Diffusion term}
+\label{ssec:diffusion}
 
 The right-hand side of each component contains a diffusion term which is the most complicated to model and for which the analytical solution is known. It is thus possible to validate this term by setting all other terms to zero and by comparing the dynamics to the analytical solution. In this model, a simple diffusion process is obtained if the following constants are set to zero: $c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_u, c_v$ and $c_w$.
-Also, the term $P \sin (\theta)$ is ignored in this validation process.
+Also, the term $P_{xx'} = P \sin (\theta)$ is ignored in this validation process.
 
 In these conditions, each component should follow the equation \ref{eq:diffusion}. For this validation process, the diffusion coefficients are set to the values that will be used in the later work.
 \begin{align}
@@ -94,7 +96,7 @@ In these conditions, each component should follow the equation \ref{eq:diffusion
 \end{align}
 where $C_i(t)$ is the value of the component $i$, $N$ is the number of dimensions (2 in our case), $D_i$ is the diffusion coefficient for the component $i$, $\sigma_i$ is the standard deviation of the gaussian distribution at $t=0$ for the component $i$ and $r$ is the distance from the center of this gaussian distribution.
 
-The diffusion process simulated for validation uses an initial gaussian distribution with $\sigma = 5$, $\epsilon = 1$ and a 2D grid with $128 \times 64$ elements. Ths diffusion coefficients are $D_u = D_v = 1.125$ and $D_w = 13.5$. The figure \ref{fig:err2-diffusion} presents the $L_2$ error of this diffusion process and show a good adequacy of the results with the expected values since the error converges to $Err_2 ~ 10^{-3}$. The increasing error starting at $t~2s$ for the component $w$ is only due to the small size of the grid combined with periodic boundary conditions, since the theoretical values do not consider these boundary conditions.
+The diffusion process simulated for validation uses an initial gaussian distribution with $\sigma = 5$, $\epsilon = 1$ and a 2D grid with $128 \times 64$ elements. The diffusion coefficients are $D_u = D_v = 1.125$ and $D_w = 13.5$. The figure \ref{fig:err2-diffusion} presents the $L_2$ error of this diffusion process and show a good adequacy of the results with the expected values since the error converges to $Err_2 ~ 10^{-3}$. The increasing error starting at $t~2s$ for the component $w$ is only due to the small size of the grid combined with periodic boundary conditions, since the theoretical values do not consider these boundary conditions. This phenomenon would also be observed on other components but for longer times since their diffusion coefficients are smaller.
 
 \begin{figure}
 \label{fig:err2-diffusion}
@@ -113,6 +115,7 @@ The diffusion process simulated for validation uses an initial gaussian distribu
 
 
 \subsection{Decay term}
+\label{ssec:decay}
 
 The second term of the right-hand side of each component is a decay term for which the analytical solution is also known. This decay process can thus be validated by setting the following constants to zero, so that the process is isolated from the others: $c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, D_u, D_v$ and $D_w$. Also, in order to validate that the process works properly for a wide range of values, the process used for validation starts from the same gaussian distribution and the same setup as for the diffusion process validation.
 
@@ -140,14 +143,44 @@ The figure \ref{fig:err2-decay} presents the $L_2$ error of this decay process a
 \end{figure}
 
 \section{Results}
+\label{sec:results}
+
+Only one complete simulation could be run (with 120000 time steps) because it takes around 1h45 on the laptop used for these tests (running on a NVIDIA GeForce GTX 1080 Ti).
+
+The figure \ref{fig:init_state_u} shows the initial state of the component $u$after a random initialization. The other components are similar. The figure \ref{fig:init_state_Pxx_u} shows the top component of the term $P_{xx'}$ and shows an issue with its initialization. This bug could not be fixed in the given time. This bug make holes in the scale boundaries, so the diffusion process can go through these boundaries, as shown in figure \ref{fig:init_state_u_13s}. Because of that,so the components tend to homogeneize along the entire system.
+
+\begin{figure}
+\label{fig:init_state_u}
+	\includegraphics[width=\textwidth]{../results/skin_dynamics/init_state.png}
+	\caption{Random initial state for the $u$ component.}
+\end{figure}
+
+\begin{figure}
+\label{fig:init_state_Pxx_u}
+	\includegraphics[width=\textwidth]{../results/skin_dynamics/init_state_Pxx_u.png}
+	\caption{Map of the $P(xx') \times \sin(\theta)$ term for the top segment of each element. The diagonal terms are not properly initialized.}
+\end{figure}
+
+\begin{figure}
+\label{fig:init_state_u_13s}
+	\includegraphics[width=\textwidth]{../results/skin_dynamics/13s_zoom.png}
+	\caption{The $u$ component after $850$ iterations. One can see that the diffusion process go through the boundaries.}
+\end{figure}
 
 \section{Perspectives}
+\label{sec:perspectives}
 
-The ASCII file format is not efficient and the result export is very slow. A strong improvement of this process could consist in using binary file format.
+The current methods and codes could be improved in several ways. The main ones foreseen are the following:
+\begin{itemize}
+	\item The main issue is that the initialization is currently broken: some of the $P \times sin(\theta)$ terms do not get proper values. Because of that, the diffusion process do not behaves as intended and all the components tend to homogeneize accrose the hexagonal scales.
+	\item The ASCII file format is not efficient and the result export is very slow (exporting one state take as much time as around 800 computation steps using a Runge-Kutta4 stepper). A strong improvement of this process could consist in using binary file format and write asynchronously.
+	\item The current code only export the components $(u, v, w)$ but do not compute actual scale colors. A post-processing Python script should be written to do that.
+	\item The initialization should be able to get a map input based on real lizard skin. In this work, the lattice is initialized randomly.
+	\item The stopping criteria is not implemented yet and should be added.
+\end{itemize}
 
 \bibliography{biblio.bib}
 
-\listoftables
 \listoffigures
 
 \end{document}
