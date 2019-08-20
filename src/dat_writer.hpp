@@ -121,6 +121,9 @@ namespace generic
 
         /**
          * \brief Writes the header.
+         * \param title The title.
+         * \param I Number of points in the X direction.
+         * \param J Number of points in the Y direction.
          * \param cols Column names.
         */
         template <typename ...ColNames>

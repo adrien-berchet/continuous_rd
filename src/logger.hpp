@@ -1,5 +1,5 @@
 /**
- * \file boost_logger.hpp
+ * \file logger.hpp
  *
  * \brief Provides a structure to log informations.
  *

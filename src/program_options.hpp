@@ -339,7 +339,6 @@ namespace generic
 	/**
 	 * \ingroup Generic
 	 * \brief This is a container to store and process parameters.
-	 * \deprecated This is quite deprecated now because Boost::program_options can replace it.
 	*/
 	class ProgramOptions
 	{

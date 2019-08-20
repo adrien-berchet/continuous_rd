@@ -6,29 +6,40 @@
 */
 #ifndef HEX_2D_LATTICE_HPP
 #define HEX_2D_LATTICE_HPP
-#include <fstream>
-#include <memory>
-#include <cmath>
 
 #include <boost/math/constants/constants.hpp>
 
+#include "dat_writer.hpp"
+
 namespace generic
 {
-	typedef thrust::host_vector< int > host_int_vector_type;
-
+	/** \brief Pi value. */
 	const double PI = boost::math::constants::pi<double>();
 
 	namespace _internals
 	{
+		/**
+		 * \brief Class to store Point data.
+		*/
 		struct Point {
+			/**@{ */
 			double x, y;
+			/**@}*/
 
+
+			/** \brief Constructor. */
 			Point(const double &x_in, const double &y_in): x(x_in), y(y_in) {}
 		};
 
+		/**
+		 * \brief Class to store Segment data.
+		*/
 		struct Segment {
+			/**@{ */
 			Point p1, p2;
+			/**@}*/
 
+			/** \brief Constructor. */
 			Segment(const Point &p1_in, const Point &p2_in): p1(p1_in), p2(p2_in) {}
 		};
 	}
@@ -50,21 +61,17 @@ namespace generic
 		*/
 		Hex2dLattice(
 			const double &side_in, const size_t &Nq_in, const size_t &Nr_in
-			// const double &side_in, const double &x_length_in, const double &y_length_in
 		):
 			side(side_in),
 			Nq(Nq_in), Nr(Nr_in), N(Nq * Nr),
 			hex_width(2. * side), hex_hor_space(hex_width * 3. / 4.), hex_vert_space(side * sqrt(3.)),
 			x_length(Nq * hex_hor_space), y_length(Nr * hex_vert_space),
-			x(generate_x(Nq, Nr)), y(generate_y(Nq, Nr))
+			x(generate_x()), y(generate_y())
 		{}
 
-		inline
-		size_t eucl_to_hex_ind(const double &x, const double &y) const
-		{
-			return 0;
-		}
-
+		/**
+		 * \brief Convert hexagonal coordinates to euclidean coordinates.
+		*/
 		inline
 		std::tuple<double, double> hex_coords_to_eucl(const double &q, const double &r) const
 		{
@@ -75,13 +82,18 @@ namespace generic
 			);
 		}
 
+		/**
+		 * \brief Convert euclidean coordinates to hexagonal coordinates.
+		 * \param x The X coordinate.
+		 * \param y The Y coordinate.
+		*/
 		inline
 		std::tuple<size_t, size_t> eucl_to_hex_coords(const double &x, const double &y) const
 		{
-			    double q = ( (2. / 3.) * x ) / side;
-			    double r = (1. / 3.) * ( -x  +  (std::sqrt(3.) * y) ) / side;
+				double q = ( (2. / 3.) * x ) / side;
+				double r = (1. / 3.) * ( -x  +  (std::sqrt(3.) * y) ) / side;
 
-				// Round coordinates
+				// Round coordinates to find the nearest hexagon center
 				int xi = int(std::round(q));
 				int zi = int(std::round(r));
 				int yi = int(std::round(-q - r));
@@ -101,6 +113,7 @@ namespace generic
 					zi = -xi - yi;
 				}
 
+				// Convert back to col and row coordinates
 				const size_t col = xi >= 0 ? xi : Nq - 1;
 				int row = zi + int((xi - (xi & 1)) / 2.);
 
@@ -217,6 +230,7 @@ namespace generic
 		}
 
 	public: // Attributes
+		/**@{ */
 		const double side;
 		const size_t Nq, Nr, N;
 		const double hex_width;
@@ -224,10 +238,14 @@ namespace generic
 		const double hex_vert_space;
 		const double x_length, y_length;
 		std::vector<double> x, y;
+		/**@}*/
 
 	private: // Methods
 
-		std::vector<double> generate_x(const size_t &Nq, const size_t &Nr)
+		/**
+		 * \brief Build the X coordinates of the hexagons.
+		*/
+		std::vector<double> generate_x()
 		{
 			std::vector<double> x_tmp(Nq * Nr);
 
@@ -246,7 +264,10 @@ namespace generic
 			return x_tmp;
 		}
 
-		std::vector<double> generate_y(const size_t &Nq, const size_t &Nr)
+		/**
+		 * \brief Build the Y coordinates of the hexagons.
+		*/
+		std::vector<double> generate_y()
 		{
 			std::vector<double> y_tmp(Nq * Nr);
 
@@ -261,29 +282,37 @@ namespace generic
 			return y_tmp;
 		}
 
-
-		bool onLine(_internals::Segment l1, _internals::Point p) const
+		/**
+		 * \brief Check if the given point is located on the given segment.
+		*/
+		inline
+		bool onLine(const _internals::Segment &l1, const _internals::Point &p) const
 		{
 			//check whether p is on the line or not
-		   if(p.x <= std::max(l1.p1.x, l1.p2.x) && p.x <= std::min(l1.p1.x, l1.p2.x) &&
-		      (p.y <= std::max(l1.p1.y, l1.p2.y) && p.y <= std::min(l1.p1.y, l1.p2.y)))
-		      return true;
+		   if(
+				 p.x <= std::max(l1.p1.x, l1.p2.x) && p.x >= std::min(l1.p1.x, l1.p2.x) &&
+				(p.y <= std::max(l1.p1.y, l1.p2.y) && p.y >= std::min(l1.p1.y, l1.p2.y))
+			)
+			  return true;
 
 		   return false;
 		}
 
-		int direction(_internals::Point a, _internals::Point b, _internals::Point c) const
+		/**
+		 * \brief Compute the orientation of the angle formed by the 3 given points.
+		*/
+		inline
+		int direction(const _internals::Point &a, const _internals::Point &b, const _internals::Point &c) const
 		{
 			int val = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
 			if (val == 0)
-		    	return 0;     //colinear
-		  	else if(val < 0)
-		    	return 2;    //anti-clockwise direction
-		    else
-	    		return 1;    //clockwise direction
+				return 0;     //colinear
+			else if(val < 0)
+				return 2;    //anti-clockwise direction
+			else
+				return 1;    //clockwise direction
 		}
 
-	// private: // Attributes
 	};
 
 /**
@@ -292,10 +321,11 @@ namespace generic
 template<typename T>
 void export_hex_lattice(const Hex2dLattice &hex, const T &hex_colors, const std::string &folder)
 {
-	BOOST_LOG_TRIVIAL(info) << "Export hexagonal lattice";
+	std::string filename = "/hex_lattice.dat";
+	BOOST_LOG_TRIVIAL(info) << "Export hexagonal lattice to "<<folder<<filename;
 
 	// Create file
-	generic::DatWriter data_file(folder + "/hex_lattice.dat");
+	generic::DatWriter data_file(folder + filename);
 
 	// Write header
 	data_file.write_header("Hexagonal lattice", hex.Nq, hex.Nr, "x", "y", "color");

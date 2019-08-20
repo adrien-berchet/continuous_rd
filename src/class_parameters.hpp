@@ -1,3 +1,9 @@
+/**
+ * \file class_parameters.hpp
+ *
+ * \brief Provides a class to parse and store command line arguments.
+ *
+*/
 #ifndef _CLASS_PARAMETERS
 #define _CLASS_PARAMETERS
 
@@ -7,12 +13,15 @@
 #include "program_options.hpp"
 
 
-// **********************************************************************
-//		classe contenant tous les paramètres du transport
-// **********************************************************************
+/**
+ * \brief Class to process and store the parameters.
+*/
 class Parameters:public generic::ProgramOptions
 {
 public:
+	/**
+	 * \brief Define the parameters.
+	*/
 	void define_parameters()
 	{
 		code_name() = "RD_challenge";
@@ -62,6 +71,9 @@ public:
 		add_param("-log_level", "Level of logger verbosity (must be one of 'trace', 'debug', 'info', 'warning', 'error', 'fatal' or 'quiet')", log_level, 1, false);
 	};
 
+	/**
+	 * \brief Constructor. Initialize default values and define parameters.
+	*/
 	Parameters()
 	{
 		epsilon=1;
@@ -73,6 +85,9 @@ public:
 		define_parameters();
 	};
 
+	/**
+	 * \brief Copy constructor.
+	*/
 	Parameters(const Parameters &a)
 	{
 		cu=a.cu;
@@ -108,8 +123,14 @@ public:
 		log_level=a.log_level;
 	};
 
+	/**
+	 * \brief Destructor.
+	*/
 	~Parameters() {};
 
+	/**
+	 * \brief Method to write the parameters into a file.
+	*/
 	void write(const std::string &name, const std::ios::openmode mode=std::ios::trunc)
 	{
 		std::ofstream file;
@@ -119,6 +140,7 @@ public:
 	};
 
 public:
+	/**@{ */
 	// Model parameters
 	double cu, cv, cw;
 	double c1, c2, c3, c4, c5, c6, c7, c8, c9;
@@ -138,6 +160,7 @@ public:
 	bool export_neighbors;
 	bool export_hex_lattice;
 	std::string log_level;
+	/**@}*/
 };
 
 #endif
