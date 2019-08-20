@@ -27,7 +27,7 @@ public:
 		code_name() = "RD_challenge";
 		description() = "Compute Reaction-Diffusion process.";
 		author() = "Adrien Berchet <adrien.berchet@gmail.com>";
-		synopsis() = code_name() + " -i [FILE] -o [FILE] [OPTIONS]...";
+		synopsis() = code_name() + " -p [FILE] [OPTIONS]...";
 
 		add_param("-cu", "The coefficient cu", cu, 1, true);
 		add_param("-cv", "The coefficient cv", cv, 1, true);

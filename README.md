@@ -19,5 +19,12 @@ Run the following commands:
 
     git clone https://github.com/adrien-berchet/continuous_rd.git
     cd continuous_rd/build
-    cmake .. # use --prefix option to use custom installation path
+    cmake .. # use -DCMAKE_INSTALL_PREFIX:PATH=<path> option to use custom installation path
     make all doc install
+
+
+## Usage
+
+Usage details are given with the following command:
+
+	./continuous_rd.exe --help

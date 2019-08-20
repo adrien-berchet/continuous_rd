@@ -792,7 +792,7 @@ namespace generic
 		{
 			std::map<bool,std::string> needed_optional;
 			needed_optional[false]="Optional";
-			needed_optional[true]="Needed";
+			needed_optional[true]="Required";
 
 			std::cout << std::endl;
 			std::cout << "========== USAGE ==========" << std::endl;
