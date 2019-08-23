@@ -68,7 +68,7 @@ void random_hex_init(T &state, const Parameters &params, T &Pxx_top, T &Pxx_bot,
 	std::fill(Pxx_right.begin(), Pxx_right.end(), std::pow(epsilon, -2.0));
 
     std::uniform_real_distribution<> perturbation(-0.1, 0.1);
-	int num=0;
+	thrust::counting_iterator<size_t> num(0);
 	for(
 		auto i=thrust::make_zip_iterator(thrust::make_tuple(
 			state.begin(),
@@ -77,7 +77,8 @@ void random_hex_init(T &state, const Parameters &params, T &Pxx_top, T &Pxx_bot,
 			Pxx_top.begin(),
 			Pxx_bot.begin(),
 			Pxx_left.begin(),
-			Pxx_right.begin()
+			Pxx_right.begin(),
+			num
 		) );
 		i != thrust::make_zip_iterator(thrust::make_tuple(
 			state.begin() + N,
@@ -86,14 +87,15 @@ void random_hex_init(T &state, const Parameters &params, T &Pxx_top, T &Pxx_bot,
 			Pxx_top.end(),
 			Pxx_bot.end(),
 			Pxx_left.end(),
-			Pxx_right.end()
+			Pxx_right.end(),
+			num + N
 		) );
 		++i
 	)
 	{
 		// Compute coordinates of the current element
-		const double x = get_x(num, Nx, epsilon);
-		const double y = get_y(num, Nx, epsilon);
+		const double x = get_x(thrust::get<7>(*i), Nx, epsilon);
+		const double y = get_y(thrust::get<7>(*i), Nx, epsilon);
 
 		// Find to which hexagon it belongs
 		size_t hex_ind = hex.hex_coords_to_ind(hex.eucl_to_hex_coords(x, y));
@@ -112,41 +114,11 @@ void random_hex_init(T &state, const Parameters &params, T &Pxx_top, T &Pxx_bot,
 		thrust::get<2>(*i) = w_init;
 
 		// Compute the Laplacian correction terms
-		const std::vector<double> top_segment{x, y, x, y + epsilon};
-		const std::vector<double> bot_segment{x, y, x, y - epsilon};
-		const std::vector<double> left_segment{x, y, x - epsilon, y};
-		const std::vector<double> right_segment{x, y, x + epsilon, y};
-
-		auto hex_segments = hex.hex_segments(hex_ind);
-
-		for (auto&& segment : hex_segments)
-		{
-			const double angle_top = hex.intersection_sin_angle(segment, top_segment);
-			if(angle_top != -10.)
-			{
-				thrust::get<3>(*i) *= P * angle_top;
-			}
-
-			const double angle_bot = hex.intersection_sin_angle(segment, bot_segment);
-			if(angle_bot != -10.)
-			{
-				thrust::get<4>(*i) *= P * angle_bot;
-			}
-
-			const double angle_left = hex.intersection_sin_angle(segment, left_segment);
-			if(angle_left != -10.)
-			{
-				thrust::get<5>(*i) *= P * angle_left;
-			}
-
-			const double angle_right = hex.intersection_sin_angle(segment, right_segment);
-			if(angle_right != -10.)
-			{
-				thrust::get<6>(*i) *= P * angle_right;
-			}
-		}
-
-		++num;
+		std::tuple<double, double, double, double> pxx_terms = hex.Pxx_terms(hex_ind, x, y, epsilon, P);
+		thrust::get<3>(*i) *= std::get<0>(pxx_terms);
+		thrust::get<4>(*i) *= std::get<1>(pxx_terms);
+		thrust::get<5>(*i) *= std::get<2>(pxx_terms);
+		thrust::get<6>(*i) *= std::get<3>(pxx_terms);
 	}
 
 	// Export hexagonal lattice if requested

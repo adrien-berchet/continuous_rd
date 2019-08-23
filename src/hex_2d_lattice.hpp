@@ -16,34 +16,6 @@ namespace generic
 	/** \brief Pi value. */
 	const double PI = boost::math::constants::pi<double>();
 
-	namespace _internals
-	{
-		/**
-		 * \brief Class to store Point data.
-		*/
-		struct Point {
-			/**@{ */
-			double x, y;
-			/**@}*/
-
-
-			/** \brief Constructor. */
-			Point(const double &x_in, const double &y_in): x(x_in), y(y_in) {}
-		};
-
-		/**
-		 * \brief Class to store Segment data.
-		*/
-		struct Segment {
-			/**@{ */
-			Point p1, p2;
-			/**@}*/
-
-			/** \brief Constructor. */
-			Segment(const Point &p1_in, const Point &p2_in): p1(p1_in), p2(p2_in) {}
-		};
-	}
-
 	/**
 	 * \ingroup generic
 	 * \brief This is a class that provides methods to create and manipulate hexagonal 2D lattice objects with vertical layout.
@@ -62,7 +34,7 @@ namespace generic
 		Hex2dLattice(
 			const double &side_in, const size_t &Nq_in, const size_t &Nr_in
 		):
-			side(side_in),
+			side(side_in), half_side(0.5 * side_in),
 			Nq(Nq_in), Nr(Nr_in), N(Nq * Nr),
 			hex_width(2. * side), hex_hor_space(hex_width * 3. / 4.), hex_vert_space(side * sqrt(3.)),
 			x_length(Nq * hex_hor_space), y_length(Nr * hex_vert_space),
@@ -170,63 +142,78 @@ namespace generic
 		}
 
 		/**
-		 * \brief Compute the angle between two segments. Return -10 if they do not intersect.
-		 * \param s1 First segment.
-		 * \param s2 Second segment.
+		* \brief Compute the P(xx') terms of a given point.
+		* \param ind Index of the hexagon in which the point is located.
+		* \param x X coordinate of the point.
+		* \param y Y coordinate of the point.
+		* \param epsilon Size of the buffer in which P(xx') < 1.
+		* \param P The factor applied to the Laplacian in the buffer.
 		*/
-		double intersection_sin_angle(
-			const std::vector<double> &s1,
-			const std::vector<double> &s2
-		) const
+		std::tuple<double, double, double, double> Pxx_terms(const size_t &ind, const double &x, const double &y, const double &epsilon, const double &P)
 		{
-			_internals::Point s1_p1(s1[0], s1[1]);
-			_internals::Point s1_p2(s1[2], s1[3]);
-			_internals::Point s2_p1(s2[0], s2[1]);
-			_internals::Point s2_p2(s2[2], s2[3]);
-			_internals::Segment l1(s1_p1, s1_p2);
-			_internals::Segment l2(s2_p1, s2_p2);
+			std::tuple<double, double, double, double> terms{1, 1, 1, 1};
+			const double &hex_x = this->x[ind];
+			const double &hex_y = this->y[ind];
 
-			// Four direction for two lines and points of other line
-			int dir1 = direction(l1.p1, l1.p2, l2.p1);
-			int dir2 = direction(l1.p1, l1.p2, l2.p2);
-			int dir3 = direction(l2.p1, l2.p2, l1.p1);
-			int dir4 = direction(l2.p1, l2.p2, l1.p2);
-
-			int intersects = 0;
-			if(dir1 != dir2 && dir3 != dir4)
-				intersects = 1; // They are intersecting
-
-			if(dir1==0 && onLine(l1, l2.p1)) // When p2 of line2 is on the line1
-				intersects = 2;
-
-			if(dir2==0 && onLine(l1, l2.p2)) // When p1 of line2 is on the line1
-				intersects = 2;
-
-			if(dir3==0 && onLine(l2, l1.p1)) // When p2 of line1 is on the line2
-				intersects = 2;
-
-			if(dir4==0 && onLine(l2, l1.p2)) // When p1 of line1 is on the line2
-				intersects = 2;
-
-			// Compute angle
-			if(intersects == 2)
+			// Top and bot components
+			if (x <= hex_x - half_side)
 			{
-				return 0;
+				// Left part
+				if (y >= sqrt3 * x - sqrt3 * (hex_x - side) + hex_y - epsilon)
+				{
+					std::get<0>(terms) = P * sin30;
+				}
+				if (y <= -sqrt3 * x + sqrt3 * (hex_x - side) + hex_y + epsilon)
+				{
+					std::get<1>(terms) = P * sin30;
+				}
 			}
-			else if(intersects == 1)
+			else if (x >= hex_x + half_side)
 			{
-				const double x1 = (s1_p2.x - s1_p1.x);
-				const double x2 = (s2_p2.x - s2_p1.x);
-				const double y1 = (s1_p2.y - s1_p1.y);
-				const double y2 = (s2_p2.y - s2_p1.y);
-				const double det = (x1 * y2 - y1 * x2);
-				const double norm = std::sqrt(std::pow(x1, 2) + std::pow(y1, 2)) * std::sqrt(std::pow(x2, 2) + std::pow(y2, 2));
-				return (norm != 0 ? det / norm : -10);
+				// Right part
+				if (y >= -sqrt3 * x + sqrt3 * (hex_x + side) + hex_y - epsilon)
+				{
+					std::get<0>(terms) = P * sin30;
+				}
+				if (y <= sqrt3 * x - sqrt3 * (hex_x + side) + hex_y + epsilon)
+				{
+					std::get<1>(terms) = P * sin30;
+				}
 			}
 			else
 			{
-				return -10;
+				// Middle part
+				if (y >= hex_y + 0.5 * hex_vert_space - epsilon)
+				{
+					std::get<0>(terms) = P;
+				}
+				else if (y <= hex_y - 0.5 * hex_vert_space + epsilon)
+				{
+					std::get<1>(terms) = P;
+				}
 			}
+
+			// Left and right components
+			if (x <= hex_x - half_side + epsilon)
+			{
+				// Left part
+				if ((y >= sqrt3 * x - sqrt3 * (hex_x - side) + hex_y - sqrt3 * epsilon) ||
+					(y <= -sqrt3 * x + sqrt3 * (hex_x - side) + hex_y + sqrt3 * epsilon))
+				{
+					std::get<2>(terms) = P * sin60;
+				}
+			}
+			else if (x >= hex_x + half_side - epsilon)
+			{
+				// Right part
+				if ((y >= -sqrt3 * x + sqrt3 * (hex_x + side) + hex_y - sqrt3 * epsilon) ||
+					(y <= sqrt3 * x - sqrt3 * (hex_x + side) + hex_y + sqrt3 * epsilon))
+				{
+					std::get<3>(terms) = P * sin60;
+				}
+			}
+
+			return terms;
 		}
 
 	public: // Attributes
@@ -282,37 +269,11 @@ namespace generic
 			return y_tmp;
 		}
 
-		/**
-		 * \brief Check if the given point is located on the given segment.
-		*/
-		inline
-		bool onLine(const _internals::Segment &l1, const _internals::Point &p) const
-		{
-			//check whether p is on the line or not
-		   if(
-				 p.x <= std::max(l1.p1.x, l1.p2.x) && p.x >= std::min(l1.p1.x, l1.p2.x) &&
-				(p.y <= std::max(l1.p1.y, l1.p2.y) && p.y >= std::min(l1.p1.y, l1.p2.y))
-			)
-			  return true;
-
-		   return false;
-		}
-
-		/**
-		 * \brief Compute the orientation of the angle formed by the 3 given points.
-		*/
-		inline
-		int direction(const _internals::Point &a, const _internals::Point &b, const _internals::Point &c) const
-		{
-			int val = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
-			if (val == 0)
-				return 0;     //colinear
-			else if(val < 0)
-				return 2;    //anti-clockwise direction
-			else
-				return 1;    //clockwise direction
-		}
-
+	private:
+		const double half_side;
+		const double sqrt3{std::sqrt(3.)};
+		const double sin30{0.5};
+		const double sin60{0.5 * std::sqrt(3.)};
 	};
 
 /**
