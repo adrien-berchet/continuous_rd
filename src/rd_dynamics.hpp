@@ -345,18 +345,14 @@ size_t number_precision(T &dt)
 */
 struct observer
 {
-	/**
-	 * \cond DOXYGEN_IGNORE
-	*/
+	/**@{ */
 	const Parameters &params;
 	const size_t N;
 	const size_t filename_length;
 	const size_t precision;
 	const state_type &Pxx_top, &Pxx_bot, &Pxx_left, &Pxx_right;
 	double last_t;
-	/**
-	 * \endcond
-	*/
+	/**@}*/
 
 
 	/**

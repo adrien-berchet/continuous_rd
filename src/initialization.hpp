@@ -35,8 +35,8 @@ void random_hex_init(T &state, const Parameters &params, T &Pxx_top, T &Pxx_bot,
 
 	// Generate hexagonal lattice
 	const double hex_width(2. * S), hex_hor_space(hex_width * 3. / 4.), hex_vert_space(S * sqrt(3.));
-	const size_t Nq(std::max(size_t(1), size_t((Nx * epsilon) / hex_hor_space)));
-	const size_t Nr(std::max(size_t(1), size_t((Ny * epsilon) / hex_vert_space)));
+	const size_t Nq(size_t(1 + (Nx * epsilon) / hex_hor_space));
+	const size_t Nr(size_t(1 + (Ny * epsilon) / hex_vert_space));
 
 	generic::Hex2dLattice hex(S, Nq, Nr);
 
@@ -50,7 +50,7 @@ void random_hex_init(T &state, const Parameters &params, T &Pxx_top, T &Pxx_bot,
 	BOOST_LOG_TRIVIAL(debug) << "\t\t hex.Nq="<<hex.Nq;
 	BOOST_LOG_TRIVIAL(debug) << "\t\t hex.Nr="<<hex.Nr;
 
-	host_int_vector_type hex_colors(hex.N, 0);
+	std::vector<int> hex_colors(hex.N, 0);
 
     // Generate random colors
 	std::random_device rd;
@@ -98,7 +98,7 @@ void random_hex_init(T &state, const Parameters &params, T &Pxx_top, T &Pxx_bot,
 		const double y = get_y(thrust::get<7>(*i), Nx, epsilon);
 
 		// Find to which hexagon it belongs
-		size_t hex_ind = hex.hex_coords_to_ind(hex.eucl_to_hex_coords(x, y));
+		size_t hex_ind = hex.hex_coords_to_ind(hex.eucl_to_rounded_hex_coords(x, y));
 
 		// Find the coordinates and color of this hexagon
 		const int &color_hex = hex_colors[hex_ind];

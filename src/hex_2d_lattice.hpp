@@ -10,6 +10,7 @@
 #include <boost/math/constants/constants.hpp>
 
 #include "dat_writer.hpp"
+#include "logger.hpp"
 
 namespace generic
 {
@@ -34,11 +35,11 @@ namespace generic
 		Hex2dLattice(
 			const double &side_in, const size_t &Nq_in, const size_t &Nr_in
 		):
-			side(side_in), half_side(0.5 * side_in),
+			side(side_in),
 			Nq(Nq_in), Nr(Nr_in), N(Nq * Nr),
 			hex_width(2. * side), hex_hor_space(hex_width * 3. / 4.), hex_vert_space(side * sqrt(3.)),
 			x_length(Nq * hex_hor_space), y_length(Nr * hex_vert_space),
-			x(generate_x()), y(generate_y())
+			x(generate_x()), y(generate_y()), half_side(0.5 * side_in)
 		{}
 
 		/**
@@ -47,54 +48,60 @@ namespace generic
 		inline
 		std::tuple<double, double> hex_coords_to_eucl(const double &q, const double &r) const
 		{
-			const double shift = (std::fmod(std::fmod(q, Nq), 2) == 0 ? 0. : 0.5 * hex_vert_space);
+			const double remainder = std::fmod(q, 2);
+			const double shift = (remainder <= 1 ? remainder * 0.5 * hex_vert_space : (2. - remainder) * 0.5 * hex_vert_space);
 			return std::make_tuple(
-				(q / Nq) * hex_hor_space + shift,
-				r * hex_vert_space
+				q * hex_hor_space,
+				r * hex_vert_space + shift
 			);
 		}
 
 		/**
-		 * \brief Convert euclidean coordinates to hexagonal coordinates.
+		 * \brief Convert euclidean coordinates to rounded hexagonal coordinates.
 		 * \param x The X coordinate.
 		 * \param y The Y coordinate.
 		*/
 		inline
-		std::tuple<size_t, size_t> eucl_to_hex_coords(const double &x, const double &y) const
+		std::tuple<size_t, size_t> eucl_to_rounded_hex_coords(const double &x, const double &y) const
 		{
-				double q = ( (2. / 3.) * x ) / side;
-				double r = (1. / 3.) * ( -x  +  (std::sqrt(3.) * y) ) / side;
+			// Compute axial coordinates
+				const double q = (2. * x ) / (3. * side);
+				const double r = (1. / 3.) * ( -x  +  (std::sqrt(3.) * y) ) / side;
 
-				// Round coordinates to find the nearest hexagon center
-				int xi = int(std::round(q));
-				int zi = int(std::round(r));
-				int yi = int(std::round(-q - r));
-				const double x_diff = std::abs(double(xi) - q);
-				const double z_diff = std::abs(double(zi) - r);
-				const double y_diff = std::abs(double(yi) - (-q - r));
-				if (x_diff > z_diff && x_diff > y_diff)
-				{
-					xi = -zi - yi;
-				}
-				else if (y_diff > z_diff)
-				{
-					yi = -xi - zi;
-				}
-				else
-				{
-					zi = -xi - yi;
-				}
+			// Round cube coordinates to find the nearest hexagon center
+			int xi = int(std::round(q));
+			int zi = int(std::round(r));
+			int yi = int(std::round(-q - r));
+			const double x_diff = std::abs(double(xi) - q);
+			const double z_diff = std::abs(double(zi) - r);
+			const double y_diff = std::abs(double(yi) - (-q - r));
+			BOOST_LOG_TRIVIAL(trace) << "("<<x<<", "<<y<<") => (q, r) = ("<<q<<", "<<r<<") ; (xi, zi, yi) = ("<<xi<<", "<<zi<<", "<<yi<<") ; diff = ("<<x_diff<<", "<<z_diff<<", "<<y_diff<<")";
 
-				// Convert back to col and row coordinates
-				const size_t col = xi >= 0 ? xi : Nq - 1;
-				int row = zi + int((xi - (xi & 1)) / 2.);
+			// Adjust values if needed
+			if (z_diff > x_diff && z_diff > y_diff)
+			{
+				zi = -xi - yi;
+			}
+			else if (x_diff > y_diff)
+			{
+				xi = -zi - yi;
+			}
+			else
+			{
+				yi = -xi - zi;
+			}
 
-				if(row < 0)
-				{
-					row = Nr - 1;
-				}
+			// Convert back to col and row coordinates
+			const int col = xi;
+			const int row = zi + size_t(xi / 2.);
 
-				return std::make_tuple(col, size_t(row));
+			BOOST_LOG_TRIVIAL(trace) << " round(xi, zi, yi) = ("<<xi<<", "<<zi<<", "<<yi<<") ; border(xi, zi, yi) = ("<<xi<<", "<<zi<<", "<<yi<<")"<<" ; col, row = "<<col<<", "<<row<<std::endl;
+
+			// Force positive values
+			return std::make_tuple(
+				col >= int(Nq) ? col - Nq : (col < 0 ? col + Nq : col),
+				row >= int(Nr) ? row - Nr : (row < 0 ? row + Nr : row)
+			);
 		}
 
 		/**
@@ -149,7 +156,7 @@ namespace generic
 		* \param epsilon Size of the buffer in which P(xx') < 1.
 		* \param P The factor applied to the Laplacian in the buffer.
 		*/
-		std::tuple<double, double, double, double> Pxx_terms(const size_t &ind, const double &x, const double &y, const double &epsilon, const double &P)
+		std::tuple<double, double, double, double> Pxx_terms(const size_t &ind, const double &x, const double &y, const double &epsilon, const double &P) const
 		{
 			std::tuple<double, double, double, double> terms{1, 1, 1, 1};
 			const double &hex_x = this->x[ind];
@@ -183,7 +190,7 @@ namespace generic
 			else
 			{
 				// Middle part
-				if (y >= hex_y + 0.5 * hex_vert_space - epsilon)
+				if (y > hex_y + 0.5 * hex_vert_space - epsilon)
 				{
 					std::get<0>(terms) = P;
 				}
@@ -270,10 +277,12 @@ namespace generic
 		}
 
 	private:
+		/**@{ */
 		const double half_side;
 		const double sqrt3{std::sqrt(3.)};
 		const double sin30{0.5};
 		const double sin60{0.5 * std::sqrt(3.)};
+		/**@}*/
 	};
 
 /**
@@ -282,36 +291,29 @@ namespace generic
 template<typename T>
 void export_hex_lattice(const Hex2dLattice &hex, const T &hex_colors, const std::string &folder)
 {
-	std::string filename = "/hex_lattice.dat";
-	BOOST_LOG_TRIVIAL(info) << "Export hexagonal lattice to "<<folder<<filename;
+	std::string filename = folder + "/hex_lattice.dat";
+	BOOST_LOG_TRIVIAL(info) << "Export hexagonal lattice to "<<filename;
 
 	// Create file
-	generic::DatWriter data_file(folder + filename);
+	generic::DatWriter data_file(filename);
 
 	// Write header
 	data_file.write_header("Hexagonal lattice", hex.Nq, hex.Nr, "x", "y", "color");
 
 	// Write data
-	for(
-		auto i=thrust::make_zip_iterator(
-			thrust::make_tuple(
-				hex.x.begin(),
-				hex.y.begin(),
-				hex_colors.begin()
-		) );
-		i != thrust::make_zip_iterator(
-			thrust::make_tuple(
-				hex.x.end(),
-				hex.y.end(),
-				hex_colors.end()
-		) );
-		++i
-	)
+	// Use raw iterators because of issues with Boost::test
+	auto x = hex.x.begin();
+	auto y = hex.y.begin();
+	auto colors = hex_colors.begin();
+	auto x_end = hex.x.end();
+	auto y_end = hex.y.end();
+	auto colors_end = hex_colors.end();
+	for (; x != x_end, y != y_end, colors != colors_end; ++ x, ++y, ++colors)
 	{
 		data_file.write_row(
-			thrust::get<0>(*i),
-			thrust::get<1>(*i),
-			thrust::get<2>(*i)
+			*x,
+			*y,
+			*colors
 		);
 	}
 }
