@@ -1,4 +1,4 @@
-**This code was made for aa application challenge (7 days but not full-time) and was not completed after the deadline. Thus there are still some missing features and bugs.**
+**This code was made for an application challenge (7 days but not full-time) and was not completed after the deadline. Thus there are still some missing features and bugs.**
 
 # Continuous Reaction-Diffusion
 
