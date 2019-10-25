@@ -1,6 +1,8 @@
+**This code was made for aa application challenge (7 days but not full-time) and was not completed after the deadline. Thus there are still some missing features and bugs.**
+
 # Continuous Reaction-Diffusion
 
-This code compute the dynamics of continuous reaction-diffusion problem.
+This code computes the dynamics of continuous reaction-diffusion problem.
 
 WARNING: The random initialization is not ready yet!
 
